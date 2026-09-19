@@ -4,7 +4,7 @@
  * Visual puro (anel que voa ao centro, brilho, flash, pisca). O nível real
  * vem do servidor; aqui só a celebração, dirigida pelo loop de render.
  */
-import { borda, novoQuadro, novoTexto, COR_TEXTO } from "./ui";
+import { novoQuadro, novoTexto } from "./ui";
 import { TILE } from "shared/pixelquest/Dados";
 
 // Quadradinho do level-up: escuro como a parede de onde saiu
@@ -77,12 +77,14 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 		py: number,
 		ehParede: (tx: number, ty: number) => boolean,
 	): void {
-		// Quadradinhos ESCUROS saem das paredes ao redor e voam DEVAGAR ao centro
+		// Quadradinhos ESCUROS saem das PAREDES (ou do vazio fora do mapa) ao
+		// redor e voam DEVAGAR ao centro. Nunca nascem em área aberta/explorada:
+		// sem parede por perto, o efeito vira só brilho + flash + título.
 		const N = 26;
 		const pcx = math.floor(px / TILE);
 		const pcy = math.floor(py / TILE);
 		const muros: [number, number][] = [];
-		for (let r = 2; r <= 6; r++) {
+		for (let r = 2; r <= 10; r++) {
 			for (let dy = -r; dy <= r; dy++) {
 				for (let dx = -r; dx <= r; dx++) {
 					if (math.max(math.abs(dx), math.abs(dy)) !== r) {
@@ -93,26 +95,24 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 					}
 				}
 			}
+			if (muros.size() >= N) {
+				break;
+			}
+		}
+		if (muros.size() === 0) {
+			alvoBrilho = brilho;
+			brilhoT = 2.8;
+			fxAtivo = true;
+			fxFlash = false;
+			return;
 		}
 		for (let k = 0; k < N; k++) {
 			const f = novoQuadro(arena, `N${proxIdLocal}`, new UDim2(0, 4, 0, 4), new UDim2(0, -50, 0, -50), COR_NIVEL, 0);
 			proxIdLocal++;
 			f.ZIndex = 19;
-			borda(f, COR_TEXTO, 1);
 			f.Visible = false;
-			let sx = px;
-			let sy = py;
-			if (muros.size() > 0) {
-				const m = muros[(k * 7) % muros.size()];
-				sx = m[0];
-				sy = m[1];
-			} else {
-				// Sem parede por perto: anel simples (fallback)
-				const a = (k / N) * math.pi * 2;
-				sx = px + math.cos(a) * 78;
-				sy = py + math.sin(a) * 78;
-			}
-			partsNivel.push({ frame: f, x0: sx, y0: sy, atraso: k * 0.045, t: 0 });
+			const m = muros[(k * 7) % muros.size()];
+			partsNivel.push({ frame: f, x0: m[0], y0: m[1], atraso: k * 0.045, t: 0 });
 		}
 		alvoBrilho = brilho;
 		brilhoT = 2.8;

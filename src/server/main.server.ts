@@ -6,6 +6,9 @@ import { atualizar, escolherMapa } from "./simulacao";
 
 // Jogo 100% interface 2D: o avatar 3D nunca nasce.
 Players.CharacterAutoLoads = false;
+// Chat: TextChatService nativo (ChatVersion é read-only em runtime — garanta
+// TextChatService nas propriedades do place). A janela/histórico é nativa; os
+// balões 2D sobre os sprites são desenhados pelo cliente.
 
 Players.PlayerAdded.Connect((player) => garantirLeaderstats(player));
 for (const player of Players.GetPlayers()) {

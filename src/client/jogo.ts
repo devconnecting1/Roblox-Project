@@ -43,6 +43,7 @@ import {
 	TOPO_Y,
 } from "./ui";
 import { criarEfeitos } from "./efeitos";
+import { criarChat } from "./chat";
 
 // ---------- Tipos internos (render) ----------
 interface EntFrame {
@@ -213,7 +214,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaJogo,
 		"Quests",
 		new UDim2(0, 215, 0, 150),
-		new UDim2(0, 10, 0, TOPO_Y + 50),
+		new UDim2(1, -225, 0, TOPO_Y + 50),
 		COR_PAINEL,
 		0.15,
 	);
@@ -442,6 +443,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let entCots: { [id: number]: EntFrame | undefined } = {};
 	let chavesCots: number[] = [];
 	const fx = criarEfeitos(arena, telaJogo);
+	const chat = criarChat(telaJogo);
 
 	// Input PC (só envia; servidor decide)
 	let teclaCima = false;
@@ -496,6 +498,20 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 	function tY(y: number): number {
 		return y - camY;
+	}
+
+	function posicaoBalao(nome: string): [number, number] | undefined {
+		const eu = Players.LocalPlayer;
+		if (eu !== undefined && eu.Name === nome && framePlayer !== undefined) {
+			const p = framePlayer.Position;
+			return [p.X.Offset + 10, p.Y.Offset - 42];
+		}
+		const ent = entOutros[nome];
+		if (ent !== undefined && ent.frame.Visible) {
+			const p = ent.frame.Position;
+			return [p.X.Offset + 9, p.Y.Offset - 40];
+		}
+		return undefined;
 	}
 
 	function garantirPoolTiles(): void {
@@ -792,7 +808,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					brilhoPlayer,
 					px,
 					py,
-					(tx, ty) => tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY && eSolido(charGrade(tx, ty)),
+					// Parede de verdade OU vazio fora do mapa (charGrade devolve "R" fora)
+					(tx, ty) => eSolido(charGrade(tx, ty)),
 				);
 			}
 			for (const e of foto.inimigos) {
@@ -999,6 +1016,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		plRX = 0;
 		plRY = 0;
 		fx.limpar();
+		chat.limpar();
 	}
 
 	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
@@ -1398,6 +1416,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 		debug.profileend(); // PQ_Entidades
 		fx.atualizar(dt, px, py, tX, tY, tempo, framePlayer);
+		chat.atualizar(dt, posicaoBalao);
 
 		if (bannerT > 0) {
 			bannerT -= dt;
