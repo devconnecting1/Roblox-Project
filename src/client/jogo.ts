@@ -345,6 +345,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const coletaveis: Coletavel[] = [];
 	const flutuantes: Flutuante[] = [];
 	const tiles: TilePool[] = [];
+	let camadaTiles: Frame | undefined = undefined;
 	let tilesCols = 0;
 	let tilesRows = 0;
 	let camTileX = -1;
@@ -431,12 +432,29 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			t.frame.Destroy();
 		}
 		tiles.clear();
+		if (camadaTiles !== undefined) {
+			camadaTiles.Destroy();
+		}
 		tilesCols = cols;
 		tilesRows = rows;
 		vistaL = w;
 		vistaA = h;
+		// Camada única que desliza TODO frame (pan suave da câmera).
+		// Os tiles têm posição LOCAL fixa no grid; só as cores mudam
+		// quando a origem cruza tile (mundo fixo, câmera que se move).
+		const camada = novoQuadro(arena, "Camada", new UDim2(0, cols * TILE, 0, rows * TILE), new UDim2(0, 0, 0, 0), COR_FUNDO, 1);
+		camada.ZIndex = 1;
+		camada.ClipsDescendants = false;
+		camadaTiles = camada;
 		for (let i = 0; i < cols * rows; i++) {
-			const f = novoQuadro(arena, `T${i}`, new UDim2(0, TILE, 0, TILE), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+			const f = novoQuadro(
+				camada,
+				`T${i}`,
+				new UDim2(0, TILE, 0, TILE),
+				new UDim2(0, (i % cols) * TILE, 0, math.floor(i / cols) * TILE),
+				COR_FUNDO,
+				0,
+			);
 			f.ZIndex = 1;
 			const d = novoQuadro(f, "D", new UDim2(0, 20, 0, 20), new UDim2(0, 14, 0, 10), COR_FUNDO, 0);
 			d.ZIndex = 2;
@@ -448,10 +466,17 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 
 	function desenharTiles(): void {
+		const camada = camadaTiles;
+		if (camada === undefined || tilesCols === 0) {
+			return;
+		}
 		const tx0 = math.floor(camX / TILE);
 		const ty0 = math.floor(camY / TILE);
+		// Pan contínuo: a camada acompanha a câmera todo frame (suave).
+		camada.Position = new UDim2(0, tx0 * TILE - camX, 0, ty0 * TILE - camY);
+		// Só recolorir ao cruzar fronteira de tile (mundo é fixo).
 		if (tx0 === camTileX && ty0 === camTileY) {
-			return; // câmera não cruzou tile: nada a redesenhar
+			return;
 		}
 		camTileX = tx0;
 		camTileY = ty0;
@@ -464,7 +489,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				ch = tileNoMundo(tx, ty);
 			}
 			t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
-			t.frame.Position = new UDim2(0, tx * TILE - camX, 0, ty * TILE - camY);
 			if (ch === "T" || ch === "*" || ch === "R") {
 				t.detalhe.Visible = true;
 				t.detalhe.BackgroundColor3 = ch === "R" ? Color3.fromRGB(70, 72, 78) : Color3.fromRGB(20, 90, 50);
