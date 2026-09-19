@@ -527,9 +527,9 @@ export interface ZonaLobby {
 }
 
 export const LOBBY_ZONAS: ZonaLobby[] = [
-	{ id: "mapas", nome: "MAPAS", x0: 24, y0: 4, x1: 35, y1: 13, cor: Color3.fromRGB(94, 234, 212) },
-	{ id: "encant", nome: "ENCANTAMENTO", x0: 4, y0: 24, x1: 15, y1: 35, cor: Color3.fromRGB(155, 89, 182) },
-	{ id: "rank", nome: "LEADERBOARDS", x0: 44, y0: 24, x1: 55, y1: 35, cor: Color3.fromRGB(255, 213, 74) },
+	{ id: "mapas", nome: "MAPAS", x0: 24, y0: 4, x1: 35, y1: 13, cor: Color3.fromRGB(70, 76, 90) },
+	{ id: "encant", nome: "ENCANTAMENTO", x0: 4, y0: 24, x1: 15, y1: 35, cor: Color3.fromRGB(60, 66, 78) },
+	{ id: "rank", nome: "LEADERBOARDS", x0: 44, y0: 24, x1: 55, y1: 35, cor: Color3.fromRGB(50, 56, 68) },
 ];
 
 // ---------- Títulos (aba do painel; exibido abaixo do jogador) ----------

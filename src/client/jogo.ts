@@ -91,7 +91,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const telaMapas = novoQuadro(gui, "Mapas", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	telaMapas.ZIndex = 70;
 	telaMapas.Visible = false;
-	novoTexto(telaMapas, "Titulo", "SELECIONE O MAPA", 40, COR_DESTAQUE, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 60));
+	novoTexto(telaMapas, "Titulo", "SELECIONE O MAPA", 40, COR_TEXTO, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 60));
 	novoTexto(
 		telaMapas,
 		"Sub",
@@ -111,25 +111,61 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		new UDim2(0, 20, 0, 470),
 	);
 	ajudaMapas.TextWrapped = true;
-	const slotsMapa: TextButton[] = [];
+	interface CardMapa {
+		btn: TextButton;
+		head: TextLabel;
+		mid: TextLabel;
+		foot: TextLabel;
+		lockCorpo: Frame;
+		lockArco: Frame;
+	}
+	const cardsMapa: CardMapa[] = [];
 	for (let i = 0; i < MAPAS.size(); i++) {
 		const b = novoBotao(
 			telaMapas,
 			`Slot${i}`,
 			"",
-			new UDim2(0, 170, 0, 150),
-			new UDim2(0.5, -449 + i * 182, 0, 200),
+			new UDim2(0, 150, 0, 220),
+			new UDim2(0.5, -403 + i * 164, 0.5, -110),
 			COR_PAINEL,
 			15,
 		);
-		slotsMapa.push(b);
+		const head = novoTexto(b, `H${i}`, "", 16, COR_TEXTO, new UDim2(1, 0, 0, 26), new UDim2(0, 0, 0, 12));
+		const mid = novoTexto(b, `M${i}`, "", 13, COR_TEXTO, new UDim2(1, -20, 0, 60), new UDim2(0, 10, 0, 66));
+		mid.TextWrapped = true;
+		const foot = novoTexto(
+			b,
+			`F${i}`,
+			"",
+			12,
+			Color3.fromRGB(150, 160, 175),
+			new UDim2(1, -20, 0, 20),
+			new UDim2(0, 10, 0, 188),
+		);
+		const lockCorpo = novoQuadro(
+			b,
+			`LC${i}`,
+			new UDim2(0, 30, 0, 24),
+			new UDim2(0.5, -15, 0, 106),
+			Color3.fromRGB(20, 24, 32),
+			0,
+		);
+		borda(lockCorpo, COR_TEXTO, 2);
+		const lockArco = novoQuadro(b, `LA${i}`, new UDim2(0, 20, 0, 16), new UDim2(0.5, -10, 0, 94), COR_TEXTO, 1);
+		const uic = new Instance("UICorner");
+		uic.CornerRadius = new UDim(0.5, 0);
+		uic.Parent = lockArco;
+		borda(lockArco, COR_TEXTO, 3);
+		lockCorpo.Visible = false;
+		lockArco.Visible = false;
+		cardsMapa.push({ btn: b, head: head, mid: mid, foot: foot, lockCorpo: lockCorpo, lockArco: lockArco });
 	}
 	const btnVoltarMapas = novoBotao(
 		telaMapas,
 		"Voltar",
 		"← VOLTAR",
 		new UDim2(0, 220, 0, 54),
-		new UDim2(0.5, -110, 0, 380),
+		new UDim2(0.5, -110, 0.5, 126),
 		COR_PAINEL,
 		18,
 	);
@@ -138,9 +174,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"Aviso",
 		"",
 		16,
-		COR_DESTAQUE,
-		new UDim2(1, 0, 0, 26),
-		new UDim2(0, 0, 0, 452),
+		COR_TEXTO,
+		new UDim2(0, 520, 0, 26),
+		new UDim2(0.5, -260, 0.5, 190),
 	);
 
 	// ----- Tela do jogo (tela cheia) -----
@@ -153,15 +189,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	const hud = novoQuadro(telaJogo, "HUD", new UDim2(1, 0, 0, 40), new UDim2(0, 0, 0, TOPO_Y), COR_PAINEL, 0.1);
 	hud.ZIndex = 50;
-	const txtMoedas = novoTexto(
-		hud,
-		"Moedas",
-		"$ 0",
-		18,
-		COR_DESTAQUE,
-		new UDim2(0, 150, 0, 40),
-		new UDim2(0, 175, 0, 0),
-	);
+	const txtMoedas = novoTexto(hud, "Moedas", "$ 0", 18, COR_TEXTO, new UDim2(0, 150, 0, 40), new UDim2(0, 175, 0, 0));
 	const txtOnda = novoTexto(hud, "Onda", "ÁREA 1", 18, COR_TEXTO, new UDim2(0, 200, 0, 40), new UDim2(0.5, -100, 0, 0));
 	const btnOpcoes = novoBotao(
 		hud,
@@ -193,7 +221,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		linhasQuest[i].TextWrapped = true;
 	}
 
-	const banner = novoTexto(telaJogo, "Banner", "", 34, COR_DESTAQUE, new UDim2(1, 0, 0, 50), new UDim2(0, 0, 0.35, 0));
+	const banner = novoTexto(telaJogo, "Banner", "", 34, COR_TEXTO, new UDim2(1, 0, 0, 50), new UDim2(0, 0, 0.35, 0));
 	banner.ZIndex = 60;
 	banner.Visible = false;
 	const rotuloPausa = novoTexto(
@@ -261,13 +289,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	);
 	painel.ZIndex = 65;
 	painel.Visible = false;
-	borda(painel, COR_DESTAQUE, 3);
+	borda(painel, COR_TEXTO, 3);
 	const tituloPainel = novoTexto(
 		painel,
 		"Titulo",
 		"OPÇÕES",
 		22,
-		COR_DESTAQUE,
+		COR_TEXTO,
 		new UDim2(1, -60, 0, 36),
 		new UDim2(0, 0, 0, 6),
 	);
@@ -313,7 +341,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"X",
 		new UDim2(0, 40, 0, 34),
 		new UDim2(1, -50, 0, 8),
-		COR_PERIGO,
+		COR_PAINEL,
 		16,
 	);
 	const rolagem = new Instance("ScrollingFrame");
@@ -724,18 +752,27 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 
 	function atualizarSeletor(): void {
-		const nv = nivelContaLocal();
 		for (let i = 0; i < MAPAS.size(); i++) {
 			const m = MAPAS[i];
-			const b = slotsMapa[i];
+			const c = cardsMapa[i];
 			if (i === 0) {
-				b.Text = `MAPA 1\n${m.nome}\n[Dungeon Crawler]`;
-				b.TextColor3 = COR_VIDA;
-				b.BackgroundColor3 = COR_PAINEL;
+				c.head.Text = `MAPA ${i + 1}`;
+				c.head.TextColor3 = COR_TEXTO;
+				c.mid.Text = m.nome;
+				c.mid.TextColor3 = COR_TEXTO;
+				c.foot.Text = "5 ÁREAS • BOSS";
+				c.btn.BackgroundColor3 = Color3.fromRGB(45, 52, 66);
+				c.lockCorpo.Visible = false;
+				c.lockArco.Visible = false;
 			} else {
-				b.Text = `MAPA ${i + 1}\n???\nNv ${m.reqNivel} • EM BREVE`;
-				b.TextColor3 = Color3.fromRGB(130, 140, 155);
-				b.BackgroundColor3 = Color3.fromRGB(18, 22, 30);
+				c.head.Text = `MAPA ${i + 1}`;
+				c.head.TextColor3 = Color3.fromRGB(130, 140, 155);
+				c.mid.Text = "???";
+				c.mid.TextColor3 = Color3.fromRGB(130, 140, 155);
+				c.foot.Text = `Nv ${m.reqNivel}`;
+				c.btn.BackgroundColor3 = Color3.fromRGB(18, 22, 30);
+				c.lockCorpo.Visible = true;
+				c.lockArco.Visible = true;
 			}
 		}
 	}
@@ -822,9 +859,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaFim.Visible = true;
 	}
 
-	for (let i = 0; i < slotsMapa.size(); i++) {
+	for (let i = 0; i < cardsMapa.size(); i++) {
 		const idx = i;
-		slotsMapa[idx].Activated.Connect(() => {
+		cardsMapa[idx].btn.Activated.Connect(() => {
 			if (idx === 0) {
 				entrarNoMapa(idx);
 			} else {
@@ -863,17 +900,17 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				fx.floater(tX(px), tY(py) - 24, `-${antes.hp - foto.hp}`, COR_PERIGO);
 			}
 			if (foto.moedas > antes.moedas) {
-				fx.floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
+				fx.floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_TEXTO);
 			}
 			if (foto.nivel > antes.nivel) {
-				fx.floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
+				fx.floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_TEXTO);
 				nivelPendente = foto.nivel;
 				fx.iniciarNivel(brilhoPlayer, px, py, (tx, ty) => eSolido(charGrade(tx, ty)));
 			}
 			for (const e of foto.inimigos) {
 				const hpAntes = inimigosVistos[e.id];
 				if (hpAntes !== undefined && e.hp < hpAntes) {
-					fx.floater(tX(e.x), tY(e.y) - 18, `${math.floor(hpAntes - e.hp)}`, COR_DESTAQUE);
+					fx.floater(tX(e.x), tY(e.y) - 18, `${math.floor(hpAntes - e.hp)}`, COR_TEXTO);
 				}
 				inimigosVistos[e.id] = e.hp;
 			}
@@ -1034,7 +1071,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			new UDim2(0, 0, 0, 20),
 		);
 		pnome.ZIndex = 14;
-		const ptitulo = novoTexto(placa, "Titulo", "", 9, COR_DESTAQUE, new UDim2(1, 0, 0, 10), new UDim2(0, 0, 0, 30));
+		const ptitulo = novoTexto(placa, "Titulo", "", 9, COR_TEXTO, new UDim2(1, 0, 0, 10), new UDim2(0, 0, 0, 30));
 		ptitulo.ZIndex = 14;
 		ptitulo.Visible = false;
 		framePlayer = p;
@@ -1422,9 +1459,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			);
 			tp.ZIndex = 65;
 			tp.Visible = false;
-			borda(tp, COR_DESTAQUE, 3);
-			novoTexto(tp, "Titulo", "LEADERBOARDS", 20, COR_DESTAQUE, new UDim2(1, 0, 0, 32), new UDim2(0, 0, 0, 6));
-			const bf = novoBotao(tp, "Fechar", "X", new UDim2(0, 40, 0, 30), new UDim2(1, -50, 0, 6), COR_PERIGO, 14);
+			borda(tp, COR_TEXTO, 3);
+			novoTexto(tp, "Titulo", "LEADERBOARDS", 20, COR_TEXTO, new UDim2(1, 0, 0, 32), new UDim2(0, 0, 0, 6));
+			const bf = novoBotao(tp, "Fechar", "X", new UDim2(0, 40, 0, 30), new UDim2(1, -50, 0, 6), COR_PAINEL, 14);
 			bf.Activated.Connect(() => fecharPlacar());
 			colPlacarNv = novoTexto(
 				tp,
