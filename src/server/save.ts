@@ -192,7 +192,7 @@ export function placar(): PlacarDados {
 		if (ds === undefined) {
 			return [];
 		}
-		const [ok, paginas] = pcall(() => ds.GetSortedAsync(false, 10));
+		const [ok, paginas] = pcall(() => ds.GetSortedAsync(false, 20));
 		if (!ok || paginas === undefined) {
 			return [];
 		}

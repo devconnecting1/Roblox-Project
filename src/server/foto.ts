@@ -28,9 +28,10 @@ function visivelPara(js: JogadorS, x: number, y: number): boolean {
 
 function enviarFoto(js: JogadorS): void {
 	const fins: Foto["inimigos"] = [];
+	const semFog = mundo.modo === "lobby"; // lobby: todos se veem
 	let bossFracao = -1;
 	for (const e of mundo.inimigos) {
-		if (!visivelPara(js, e.x, e.y)) {
+		if (!semFog && !visivelPara(js, e.x, e.y)) {
 			continue;
 		}
 		fins.push({
@@ -52,21 +53,21 @@ function enviarFoto(js: JogadorS): void {
 	}
 	const fbalas: Foto["balas"] = [];
 	for (const b of mundo.balas) {
-		if (!visivelPara(js, b.x, b.y)) {
+		if (!semFog && !visivelPara(js, b.x, b.y)) {
 			continue;
 		}
 		fbalas.push({ id: b.id, x: b.x, y: b.y, amiga: b.amiga, tam: b.tam });
 	}
 	const fcots: Foto["cots"] = [];
 	for (const c of mundo.cots) {
-		if (!visivelPara(js, c.x, c.y)) {
+		if (!semFog && !visivelPara(js, c.x, c.y)) {
 			continue;
 		}
 		fcots.push({ id: c.id, x: c.x, y: c.y, tipo: c.tipo });
 	}
 	const fjogs: Foto["jogadores"] = [];
 	for (const [, outro] of mundo.jogadores) {
-		if (outro === js || outro.morto || !visivelPara(js, outro.x, outro.y)) {
+		if (outro === js || outro.morto || (!semFog && !visivelPara(js, outro.x, outro.y))) {
 			continue;
 		}
 		fjogs.push({ nome: outro.player.Name, x: outro.x, y: outro.y, nv: outro.nivel, r: 90, g: 220, b: 120 });

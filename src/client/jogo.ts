@@ -17,6 +17,7 @@ import {
 	ITEM_POR_ID,
 	LOBBY_ZONAS,
 	MAPAS,
+	ZonaLobby,
 	MUNDO_TX,
 	MUNDO_TY,
 	NOME_SLOT,
@@ -258,6 +259,28 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	);
 	rotuloDebug.ZIndex = 60;
 	rotuloDebug.TextXAlignment = Enum.TextXAlignment.Left;
+	// Botão de ação da zona do lobby (texto por tipo de área)
+	const btnZona = novoBotao(
+		telaJogo,
+		"Zona",
+		"",
+		new UDim2(0, 180, 0, 34),
+		new UDim2(0, -500, 0, -500),
+		COR_PAINEL,
+		15,
+	);
+	btnZona.ZIndex = 56;
+	btnZona.Visible = false;
+	btnZona.Activated.Connect(() => {
+		if (zonaLobby === "mapas") {
+			abrirSeletor();
+		} else if (zonaLobby === "encant") {
+			mostrarBanner("ENCANTAMENTO — EM BREVE! Novos poderes a caminho...", 2.5);
+		} else if (zonaLobby === "rank") {
+			Remotes.Client.Get("Placar").SendToServer();
+			abrirPlacar();
+		}
+	});
 	const barraBossFundo = novoQuadro(
 		telaJogo,
 		"BossFundo",
@@ -423,13 +446,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let ultimoFotoT = -99;
 	let semente = 0;
 	let nivelPendente = 0;
+	let semFog = false; // lobby: tudo visível, sem névoa
 	let zonaLobby: "mapas" | "encant" | "rank" | undefined = undefined;
 	let placarAberto = false;
 	let telaPlacar: Frame | undefined = undefined;
 	let colPlacarNv: TextLabel | undefined = undefined;
 	let colPlacarKill: TextLabel | undefined = undefined;
 	let colPlacarMoeda: TextLabel | undefined = undefined;
-	let zonaFrames: { rect: Frame; rotulo: TextLabel; wx: number; wy: number; wh: number }[] = [];
+	let zonaFrames: { id: string; rect: Frame; rotulo: TextLabel; wx: number; wy: number; ww: number; wh: number }[] = [];
 	let hudMoedas = -1;
 	let hudOnda = "";
 	let hudPausa = false;
@@ -720,7 +744,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const cx = (tx + 0.5) * TILE - px;
 			const cy = (ty + 0.5) * TILE - py;
 			const perto = cx * cx + cy * cy < VISAO * VISAO;
-			const vis = perto && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
+			const vis = semFog ? dentro : perto && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
 			const exp = dentro && explorado[ty * MUNDO_TX + tx];
 			if (!vis && !exp) {
 				t.frame.Visible = false; // inexplorado: some (fundo preto)
@@ -943,6 +967,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (ev.tipo === "mapa") {
 			grade = ev.grade;
 			semente = ev.seed;
+			semFog = ev.lobby;
 			explorado = [];
 			for (let i = 0; i < MUNDO_TX * MUNDO_TY; i++) {
 				explorado.push(false);
@@ -1367,27 +1392,33 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		return undefined;
 	}
 
+	function padDaZona(z: ZonaLobby): { wx: number; wy: number; ww: number; wh: number } {
+		// Selo pequeno (5x3) centrado na sala — não preenche a área
+		const cx = (z.x0 + z.x1) / 2;
+		const cy = (z.y0 + z.y1) / 2;
+		const x0p = math.floor(cx - 2);
+		const y0p = math.floor(cy - 1);
+		return { wx: x0p * TILE, wy: y0p * TILE, ww: 5 * TILE, wh: 3 * TILE };
+	}
+
 	function construirZonas(): void {
 		limparZonas();
 		for (const z of LOBBY_ZONAS) {
-			const wx = z.x0 * TILE;
-			const wy = z.y0 * TILE;
-			const ww = (z.x1 - z.x0 + 1) * TILE;
-			const wh = (z.y1 - z.y0 + 1) * TILE;
-			const rect = novoQuadro(arena, `Z_${z.id}`, new UDim2(0, ww, 0, wh), new UDim2(0, 0, 0, 0), z.cor, 0.75);
+			const pad = padDaZona(z);
+			const rect = novoQuadro(arena, `Z_${z.id}`, new UDim2(0, pad.ww, 0, pad.wh), new UDim2(0, 0, 0, 0), z.cor, 0.6);
 			rect.ZIndex = 3;
 			borda(rect, COR_TEXTO, 2);
 			const rotulo = novoTexto(
 				arena,
 				`ZL_${z.id}`,
 				z.nome,
-				16,
+				15,
 				COR_TEXTO,
-				new UDim2(0, ww, 0, 28),
+				new UDim2(0, pad.ww, 0, 26),
 				new UDim2(0, 0, 0, 0),
 			);
 			rotulo.ZIndex = 4;
-			zonaFrames.push({ rect: rect, rotulo: rotulo, wx: wx, wy: wy, wh: wh });
+			zonaFrames.push({ id: z.id, rect: rect, rotulo: rotulo, wx: pad.wx, wy: pad.wy, ww: pad.ww, wh: pad.wh });
 		}
 	}
 
@@ -1404,8 +1435,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const tp = novoQuadro(
 				telaJogo,
 				"Placar",
-				new UDim2(0, 520, 0, 330),
-				new UDim2(0.5, -260, 0.5, -165),
+				new UDim2(0, 520, 0, 440),
+				new UDim2(0.5, -260, 0.5, -220),
 				COR_PAINEL,
 				0,
 			);
@@ -1419,27 +1450,27 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				tp,
 				"CNv",
 				"NÍVEL\ncarregando...",
-				13,
+				12,
 				COR_TEXTO,
-				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 150, 0, 370),
 				new UDim2(0, 14, 0, 44),
 			);
 			colPlacarKill = novoTexto(
 				tp,
 				"CKill",
 				"MATANÇA\ncarregando...",
-				13,
+				12,
 				COR_TEXTO,
-				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 150, 0, 370),
 				new UDim2(0, 185, 0, 44),
 			);
 			colPlacarMoeda = novoTexto(
 				tp,
 				"CMoed",
 				"MOEDAS\ncarregando...",
-				13,
+				12,
 				COR_TEXTO,
-				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 150, 0, 370),
 				new UDim2(0, 356, 0, 44),
 			);
 			for (const col of [colPlacarNv, colPlacarKill, colPlacarMoeda]) {
@@ -1472,7 +1503,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				return "— vazio —";
 			}
 			const partes: string[] = [];
-			for (let i = 0; i < linhas.size() && i < 10; i++) {
+			for (let i = 0; i < linhas.size() && i < 20; i++) {
 				partes.push(`${i + 1}. ${linhas[i].nome} — ${linhas[i].valor}`);
 			}
 			return partes.join("\n");
@@ -1605,26 +1636,30 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		desenharTiles();
 		debug.profileend();
 
-		// Zonas do lobby: MAPAS abre o seletor, ENCANT avisa, RANK mostra o placar
+		// Zonas do lobby: selo pequeno + botão de ação ao pisar (por tipo de área)
 		if (foto.lobby) {
 			const zona = zonaLobbyEm(math.floor(foto.px / TILE), math.floor(foto.py / TILE));
 			if (zona !== zonaLobby) {
 				zonaLobby = zona;
-				if (zona === "mapas") {
-					abrirSeletor();
-				} else if (zona === "encant") {
-					mostrarBanner("ENCANTAMENTO — EM BREVE!", 2);
-				} else if (zona === "rank") {
-					Remotes.Client.Get("Placar").SendToServer();
-					abrirPlacar();
-				} else if (placarAberto) {
-					fecharPlacar();
+				if (zona === undefined) {
+					btnZona.Visible = false;
+					if (placarAberto) {
+						fecharPlacar();
+					}
+				} else {
+					btnZona.Text = zona === "mapas" ? "▶ JOGAR" : zona === "rank" ? "VER PLACAR" : "VER";
+					btnZona.Visible = true;
 				}
 			}
 			for (const z of zonaFrames) {
 				z.rect.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy));
 				z.rotulo.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy) + z.wh / 2 - 14);
+				if (z.id === zonaLobby) {
+					btnZona.Position = new UDim2(0, tX(z.wx) + z.ww / 2 - 90, 0, tY(z.wy) + z.wh + 6);
+				}
 			}
+		} else if (btnZona.Visible) {
+			btnZona.Visible = false;
 		}
 
 		// Jogador local
