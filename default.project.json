@@ -1,5 +1,6 @@
 {
 	"name": "Roblox-Project",
+	"servePort": 34872,
 	"globIgnorePaths": [
 		"**/package.json",
 		"**/tsconfig.json"

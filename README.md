@@ -3,16 +3,25 @@
 Casa construída 100% via código TypeScript compilado para Luau, pronta para usar no **Roblox Studio via plugin do Rojo**.
 
 - Engine: [roblox-ts](https://roblox-ts.com/) 3.x (TypeScript → Luau)
-- Sync/build: [Rojo](https://rojo.space/) 7.7.0
+- Sync/build: [Rojo](https://rojo.space/) 7.7.0 (`servePort: 34872`)
+- Deps [@rbxts](https://www.npmjs.com/org/rbxts): `@rbxts/services` (acesso tipado aos Services), `@rbxts/t` (validação runtime)
 - Build automático: GitHub Actions (`.github/workflows/build.yml`) gera `build.rbxlx` a cada push na `main`.
+
+## Boas práticas (docs)
+
+- [roblox-ts API](https://roblox-ts.com/docs/api/roblox-api): `new Instance()`/`new Vector3()`, `undefined` = `nil`, `typeIs`/validadores para dados externos
+- [Indexing children](https://roblox-ts.com/docs/guides/indexing-children): `FindFirstChild + IsA` em vez de indexação direta; tipos do DataModel em `src/services.d.ts`
+- [Syncing with Rojo](https://roblox-ts.com/docs/guides/syncing-with-rojo): `$path` relativos a `out/`, `rbxts_include` em `ReplicatedStorage`
+- [Rojo project format](https://rojo.space/docs/v7/project-format/): `servePort` fixo; [sync details](https://rojo.space/docs/v7/sync-details/): `*.server.ts` → `Script`, `*.client.ts` → `LocalScript`
 
 ## Estrutura
 
 ```
 src/
   server/main.server.ts   -> chama construirCasa()
-  client/main.client.ts   -> verifica CasaTeste na Workspace
-  shared/Casa.ts          -> construtor da casa (Part, WedgePart, Cylinder, Ball, PointLight)
+  client/main.client.ts   -> verifica CasaTeste na Workspace (services + IsA guard)
+  shared/Casa.ts          -> construtor da casa (Part, WedgePart, Cylinder, Ball, PointLight + validação @rbxts/t)
+  services.d.ts           -> tipagem ambiente do DataModel (Workspace.CasaTeste?)
 default.project.json      -> mapeia out/ para DataModel (ServerScriptService, ReplicatedStorage, StarterPlayer)
 out/                      -> Luau gerado pelo rbxtsc (ignorado no git)
 build.rbxlx               -> place gerado pelo rojo (ignorado no git, disponível como Artifact no CI)

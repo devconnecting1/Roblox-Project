@@ -1,12 +1,23 @@
 /**
  * Casa de teste 3D — construída 100% via código (roblox-ts).
  *
+ * Boas práticas aplicadas (docs roblox-ts + Rojo v7):
+ * - `new Instance()` / `new Vector3()` em vez de `.new()` (api/roblox-api)
+ * - `import { Workspace } from "@rbxts/services"` em vez de `game:GetService`
+ * - Validação runtime com `@rbxts/t` (api/roblox-api: RemoteEvent types)
+ * - `undefined` como `nil`, `task.wait` no client, `FindFirstChild + IsA`
+ *   em vez de indexação direta (guides/indexing-children)
+ *
  * Como usar no Studio via Rojo:
  * 1. `npm run watch` (rbxtsc -w)
- * 2. `rojo serve` e conectar o plugin no Studio
+ * 2. `rojo serve` (porta 34872, ver `servePort` em default.project.json)
+ *    e conectar o plugin no Studio
  * 3. O script `src/server/main.server.ts` chama `construirCasa()`
  *    e a casa aparece na Workspace como Model "CasaTeste".
  */
+
+import { t } from "@rbxts/t";
+import { Workspace } from "@rbxts/services";
 
 function criarParte(props: {
 	nome: string;
@@ -79,13 +90,48 @@ export interface CasaConfig {
  * Se já existir um Model "CasaTeste", ele é removido antes (idempotente).
  */
 export function construirCasa(config: CasaConfig = {}): Model {
-	const centro = config.centro ?? new Vector3(0, 0, 0);
-	const L = config.largura ?? 24;
-	const H = config.alturaParede ?? 8;
-	const P = config.profundidade ?? 16;
+	// Validação runtime (https://roblox-ts.com/docs/api/roblox-api):
+	// nunca confie em valores externos — invalide com warn + default seguro.
+	const eMedida = t.numberConstrained(4, 200);
+
+	let centro = new Vector3(0, 0, 0);
+	if (config.centro !== undefined) {
+		if (t.Vector3(config.centro)) {
+			centro = config.centro;
+		} else {
+			warn("[CasaTeste] config.centro inválido — usando (0, 0, 0).");
+		}
+	}
+
+	let L = 24;
+	if (config.largura !== undefined) {
+		if (eMedida(config.largura)) {
+			L = config.largura;
+		} else {
+			warn("[CasaTeste] config.largura inválida (use 4–200) — usando 24.");
+		}
+	}
+
+	let H = 8;
+	if (config.alturaParede !== undefined) {
+		if (eMedida(config.alturaParede)) {
+			H = config.alturaParede;
+		} else {
+			warn("[CasaTeste] config.alturaParede inválida (use 4–200) — usando 8.");
+		}
+	}
+
+	let P = 16;
+	if (config.profundidade !== undefined) {
+		if (eMedida(config.profundidade)) {
+			P = config.profundidade;
+		} else {
+			warn("[CasaTeste] config.profundidade inválida (use 4–200) — usando 16.");
+		}
+	}
 	const T = 1; // espessura das paredes
 
-	const workspace = game.GetService("Workspace");
+	const workspace = Workspace;
 
 	// Remove versão antiga (re-build limpo a cada Play / sync do Rojo)
 	const antiga = workspace.FindFirstChild("CasaTeste");
