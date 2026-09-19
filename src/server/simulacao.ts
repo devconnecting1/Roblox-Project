@@ -33,6 +33,8 @@ import { Remotes } from "shared/pixelquest/Rede";
 import { EntradaPayload, EventoPayload, Foto } from "shared/pixelquest/Dados";
 import { Porta, abrirPorta, acharChaoPerto, areaDe, areaSolida, chaoNaArea, gerarMundo, gradeStrings, lerTile } from "./mundo";
 
+type EstadoInimigo = "patrulha" | "perseguir" | "cacar";
+
 interface InimigoS {
 	id: number;
 	info: InimigoInfo;
@@ -46,6 +48,17 @@ interface InimigoS {
 	danoBala: number;
 	tiroT: number;
 	rajadaT: number;
+	// Sentidos: visão com paredes, memória e caça em equipe
+	estado: EstadoInimigo;
+	alvo: JogadorS | undefined;
+	vistoX: number;
+	vistoY: number;
+	esperaT: number;
+	procT: number;
+	dirWX: number;
+	dirWY: number;
+	ancoraX: number;
+	ancoraY: number;
 }
 
 interface BalaS {
@@ -202,6 +215,7 @@ function difundir(ev: EventoPayload): void {
 function nascerInimigo(info: InimigoInfo, boss: boolean, area: number, x: number, y: number): void {
 	const mul = 1 + area * 0.15;
 	mundo.proxId++;
+	const a = math.random() * math.pi * 2;
 	mundo.inimigos.push({
 		id: mundo.proxId,
 		info: info,
@@ -215,6 +229,16 @@ function nascerInimigo(info: InimigoInfo, boss: boolean, area: number, x: number
 		danoBala: info.danoBala + area,
 		tiroT: 1 + math.random(),
 		rajadaT: 2,
+		estado: "patrulha",
+		alvo: undefined,
+		vistoX: x,
+		vistoY: y,
+		esperaT: math.random() * 2,
+		procT: 0,
+		dirWX: math.cos(a),
+		dirWY: math.sin(a),
+		ancoraX: x,
+		ancoraY: y,
 	});
 	mundo.vivosPorArea[area]++;
 }
@@ -609,9 +633,50 @@ function jogadorMaisProximo(x: number, y: number): JogadorS | undefined {
 	return melhor;
 }
 
+const ALCANCE_VISAO = 420;
+
+function tileSolidoEm(x: number, y: number): boolean {
+	const tx = math.floor(x / TILE);
+	const ty = math.floor(y / TILE);
+	return eSolido(lerTile(tx, ty));
+}
+
+/** Linha de visão: paredes bloqueiam (inimigo não enxerga através). */
+function temVisada(ax: number, ay: number, bx: number, by: number): boolean {
+	const dx = bx - ax;
+	const dy = by - ay;
+	const d = math.sqrt(dx * dx + dy * dy);
+	if (d > ALCANCE_VISAO || d < 1) {
+		return d < 1;
+	}
+	const passos = math.floor(d / 12);
+	for (let i = 1; i <= passos; i++) {
+		const t = i / (passos + 1);
+		if (tileSolidoEm(ax + dx * t, ay + dy * t)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/** Caça em equipe: quem avista chama aliados próximos para procurar junto. */
+function alertarAliados(px: number, py: number, excetoId: number): void {
+	for (const a of mundo.inimigos) {
+		if (a.id === excetoId || a.estado === "perseguir") {
+			continue;
+		}
+		// Aliado "escuta" se está a até 420px do avistamento
+		if (dist2(a.x, a.y, px, py) < 420 * 420) {
+			a.estado = "cacar";
+			a.vistoX = px;
+			a.vistoY = py;
+			a.procT = 7;
+		}
+	}
+}
+
 // ---------- Update ----------
 const MAX_BALAS = 160;
-
 /** Push com teto (anti-spam/lag: descarta excedente). */
 function empurrarBala(b: BalaS): void {
 	if (mundo.balas.size() < MAX_BALAS) {
@@ -694,23 +759,93 @@ export function atualizar(dt: number): void {
 		}
 	}
 
-	// Inimigos: persegue o jogador mais próximo + tiros
+	// Inimigos: visão com paredes, memória e caça em equipe
 	for (let i = mundo.inimigos.size() - 1; i >= 0; i--) {
 		const e = mundo.inimigos[i];
-		const alvo = jogadorMaisProximo(e.x, e.y);
-		if (alvo === undefined) {
-			continue;
+		// 1. Tenta avistar (vivo mais próximo, com linha de visão)
+		let avistado: JogadorS | undefined = undefined;
+		let avistD = ALCANCE_VISAO * ALCANCE_VISAO;
+		for (const [, js] of mundo.jogadores) {
+			if (js.morto) {
+				continue;
+			}
+			const dd = dist2(e.x, e.y, js.x, js.y);
+			if (dd < avistD && temVisada(e.x, e.y, js.x, js.y)) {
+				avistD = dd;
+				avistado = js;
+			}
 		}
-		const dx = alvo.x - e.x;
-		const dy = alvo.y - e.y;
-		const d = math.sqrt(dx * dx + dy * dy);
-		if (d > 1) {
+		if (avistado !== undefined) {
+			if (e.estado !== "perseguir") {
+				alertarAliados(avistado.x, avistado.y, e.id);
+			}
+			e.estado = "perseguir";
+			e.alvo = avistado;
+			e.vistoX = avistado.x;
+			e.vistoY = avistado.y;
+		} else if (e.estado === "perseguir") {
+			e.estado = "cacar"; // perdeu de vista: caça a última posição
+			e.procT = 7;
+		}
+		// 2. Age conforme o estado
+		let alvoX = e.x;
+		let alvoY = e.y;
+		let velMul = 1;
+		if (e.estado === "perseguir" && e.alvo !== undefined && !e.alvo.morto) {
+			alvoX = e.alvo.x;
+			alvoY = e.alvo.y;
+		} else if (e.estado === "cacar") {
+			alvoX = e.vistoX;
+			alvoY = e.vistoY;
+			if (dist2(e.x, e.y, alvoX, alvoY) < 26 * 26) {
+				// Chegou onde viu: vasculha ao redor e desiste após um tempo
+				if (e.esperaT > 0) {
+					e.esperaT -= dt;
+				} else {
+					const a = math.random() * math.pi * 2;
+					e.dirWX = math.cos(a);
+					e.dirWY = math.sin(a);
+					e.esperaT = 1 + math.random() * 1.5;
+				}
+				alvoX = e.x + e.dirWX * 70;
+				alvoY = e.y + e.dirWY * 70;
+				velMul = 0.45;
+				e.procT -= dt;
+				if (e.procT <= 0) {
+					e.estado = "patrulha";
+					e.alvo = undefined;
+				}
+			}
+		} else {
+			// Patrulha lenta na âncora (com coleira: volta se longe)
+			if (dist2(e.x, e.y, e.ancoraX, e.ancoraY) > 500 * 500) {
+				alvoX = e.ancoraX;
+				alvoY = e.ancoraY;
+				velMul = 0.5;
+			} else {
+				if (e.esperaT > 0) {
+					e.esperaT -= dt;
+				} else {
+					const a = math.random() * math.pi * 2;
+					e.dirWX = math.cos(a);
+					e.dirWY = math.sin(a);
+					e.esperaT = 1.5 + math.random() * 1.5;
+				}
+				alvoX = e.x + e.dirWX * 80;
+				alvoY = e.y + e.dirWY * 80;
+				velMul = 0.4;
+			}
+		}
+		const mdx = alvoX - e.x;
+		const mdy = alvoY - e.y;
+		const md = math.sqrt(mdx * mdx + mdy * mdy);
+		if (md > 1) {
 			const er = e.info.tamanho / 2;
-			const ex = e.x + (dx / d) * e.info.velocidade * dt;
+			const ex = e.x + (mdx / md) * e.info.velocidade * velMul * dt;
 			if (!areaSolida(ex, e.y, er)) {
 				e.x = ex;
 			}
-			const ey = e.y + (dy / d) * e.info.velocidade * dt;
+			const ey = e.y + (mdy / md) * e.info.velocidade * velMul * dt;
 			if (!areaSolida(e.x, ey, er)) {
 				e.y = ey;
 			}
@@ -724,24 +859,30 @@ export function atualizar(dt: number): void {
 				ferirJogador(js, e.danoContato);
 			}
 		}
+		// Tiros SÓ com visão (nada de atirar através da parede)
 		if (e.tiroT > 0) {
 			e.tiroT -= dt;
 		}
-		if (e.info.atira && e.tiroT <= 0 && d < 380 && d > 1) {
-			if (e.boss) {
-				for (let k = -1; k <= 1; k++) {
-					const base = math.atan2(dy, dx) + k * 0.22;
-					empurrarBala({ x: e.x, y: e.y, vx: math.cos(base) * e.info.velBala, vy: math.sin(base) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+		if (e.estado === "perseguir" && e.alvo !== undefined && !e.alvo.morto) {
+			const tdx = e.alvo.x - e.x;
+			const tdy = e.alvo.y - e.y;
+			const td = math.sqrt(tdx * tdx + tdy * tdy);
+			if (e.info.atira && e.tiroT <= 0 && td < 380 && td > 1) {
+				if (e.boss) {
+					for (let k = -1; k <= 1; k++) {
+						const base = math.atan2(tdy, tdx) + k * 0.22;
+						empurrarBala({ x: e.x, y: e.y, vx: math.cos(base) * e.info.velBala, vy: math.sin(base) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+					}
+				} else {
+					empurrarBala({ x: e.x, y: e.y, vx: (tdx / td) * e.info.velBala, vy: (tdy / td) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
 				}
-			} else {
-				empurrarBala({ x: e.x, y: e.y, vx: (dx / d) * e.info.velBala, vy: (dy / d) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+				e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 			}
-			e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 		}
 		if (e.rajadaT > 0) {
 			e.rajadaT -= dt;
 		}
-		if (e.boss && e.rajadaT <= 0) {
+		if (e.boss && e.estado === "perseguir" && e.rajadaT <= 0) {
 			for (let k = 0; k < 12; k++) {
 				const a = (k / 12) * math.pi * 2 + mundo.tempo;
 				empurrarBala({ x: e.x, y: e.y, vx: math.cos(a) * 110, vy: math.sin(a) * 110, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
@@ -877,12 +1018,6 @@ export function atualizar(dt: number): void {
 			}
 		}
 	}
-}
-
-function tileSolidoEm(x: number, y: number): boolean {
-	const tx = math.floor(x / TILE);
-	const ty = math.floor(y / TILE);
-	return eSolido(lerTile(tx, ty));
 }
 
 // ---------- Snapshot (só o visível: Fog of War real) ----------
