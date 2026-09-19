@@ -85,57 +85,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
 	gui.Parent = playerGui;
 
-	// ----- Menu -----
-	const telaMenu = novoQuadro(gui, "Menu", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
-	telaMenu.ZIndex = 70;
-	novoTexto(telaMenu, "Titulo", "PIXEL QUEST 2D", 56, COR_DESTAQUE, new UDim2(1, 0, 0, 80), new UDim2(0, 0, 0, 60));
-	novoTexto(
-		telaMenu,
-		"Sub",
-		"Após 1x1x1x1 destruir a 3ª dimensão, restou o mundo 2D. Sobreviva!",
-		18,
-		COR_TEXTO,
-		new UDim2(1, 0, 0, 30),
-		new UDim2(0, 0, 0, 145),
-	);
-	novoTexto(
-		telaMenu,
-		"Escolha",
-		"— UMA CLASSE, 5 ÁREAS, 1 SEREIA —",
-		22,
-		COR_TEXTO,
-		new UDim2(1, 0, 0, 30),
-		new UDim2(0, 0, 0, 195),
-	);
-	const infoClasse = CLASSES[0];
-	novoTexto(
-		telaMenu,
-		"ClasseInfo",
-		`${infoClasse.nome} — ${infoClasse.descricao}\nHP ${infoClasse.hpMax} | Dano ${infoClasse.dano}`,
-		18,
-		infoClasse.cor,
-		new UDim2(1, 0, 0, 60),
-		new UDim2(0, 0, 0, 232),
-	);
-	const btnJogar = novoBotao(
-		telaMenu,
-		"Jogar",
-		"▶  JOGAR",
-		new UDim2(0, 300, 0, 70),
-		new UDim2(0.5, -150, 0, 305),
-		COR_PAINEL,
-		26,
-	);
-	const ajuda = novoTexto(
-		telaMenu,
-		"Ajuda",
-		"PC: WASD/setas movem | Mouse mira | BOTÃO ESQ segura p/ atirar | E: tiro automático ON/OFF\nSHIFT/L: dash com invencibilidade | P: pausar | ≡ OPÇÕES: tarefas, mochila, equip e títulos | Explore as 5 áreas!",
-		15,
-		Color3.fromRGB(160, 175, 195),
-		new UDim2(1, -40, 0, 60),
-		new UDim2(0, 20, 0, 395),
-	);
-	ajuda.TextWrapped = true;
+	// (Menu removido: entra direto no lobby)
 
 	// ----- Seletor de mapas -----
 	const telaMapas = novoQuadro(gui, "Mapas", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
@@ -151,6 +101,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		new UDim2(1, 0, 0, 26),
 		new UDim2(0, 0, 0, 135),
 	);
+	const ajudaMapas = novoTexto(
+		telaMapas,
+		"Ajuda",
+		"WASD/setas movem | Mouse mira | BOTÃO ESQ atira | E: auto-tiro | BOTÃO DIR: dash | P: pausa | Fique 3s no selo do lobby",
+		12,
+		Color3.fromRGB(160, 175, 195),
+		new UDim2(1, -40, 0, 40),
+		new UDim2(0, 20, 0, 470),
+	);
+	ajudaMapas.TextWrapped = true;
 	const slotsMapa: TextButton[] = [];
 	for (let i = 0; i < MAPAS.size(); i++) {
 		const b = novoBotao(
@@ -259,28 +219,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	);
 	rotuloDebug.ZIndex = 60;
 	rotuloDebug.TextXAlignment = Enum.TextXAlignment.Left;
-	// Botão de ação da zona do lobby (texto por tipo de área)
-	const btnZona = novoBotao(
-		telaJogo,
-		"Zona",
-		"",
-		new UDim2(0, 180, 0, 34),
-		new UDim2(0, -500, 0, -500),
-		COR_PAINEL,
-		15,
-	);
-	btnZona.ZIndex = 56;
-	btnZona.Visible = false;
-	btnZona.Activated.Connect(() => {
-		if (zonaLobby === "mapas") {
-			abrirSeletor();
-		} else if (zonaLobby === "encant") {
-			mostrarBanner("ENCANTAMENTO — EM BREVE! Novos poderes a caminho...", 2.5);
-		} else if (zonaLobby === "rank") {
-			Remotes.Client.Get("Placar").SendToServer();
-			abrirPlacar();
-		}
-	});
+	// Preenchedor de borda do selo (hold 3s): 4 barras que fecham o retângulo
+	const fillBorda: Frame[] = [];
+	for (let k = 0; k < 4; k++) {
+		const fb = novoQuadro(arena, `Fill${k}`, new UDim2(0, 6, 0, 6), new UDim2(0, -500, 0, -500), COR_TEXTO, 0);
+		fb.ZIndex = 5;
+		fb.Visible = false;
+		fillBorda.push(fb);
+	}
 	const barraBossFundo = novoQuadro(
 		telaJogo,
 		"BossFundo",
@@ -404,7 +350,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"DeNovo",
 		"JOGAR DE NOVO",
 		new UDim2(0, 170, 0, 60),
-		new UDim2(0.5, -265, 0, 390),
+		new UDim2(0.5, -180, 0, 390),
 		COR_PAINEL,
 		18,
 	);
@@ -413,22 +359,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"Lobby",
 		"LOBBY",
 		new UDim2(0, 170, 0, 60),
-		new UDim2(0.5, -85, 0, 390),
-		COR_PAINEL,
-		18,
-	);
-	const btnMenu = novoBotao(
-		telaFim,
-		"Menu",
-		"MENU",
-		new UDim2(0, 170, 0, 60),
-		new UDim2(0.5, 95, 0, 390),
+		new UDim2(0.5, 10, 0, 390),
 		COR_PAINEL,
 		18,
 	);
 
 	// ===== Estado de render (espelho do servidor) =====
-	let estado: "menu" | "mapas" | "jogo" | "fim" = "menu";
+	let estado: "mapas" | "jogo" | "fim" = "jogo";
 	let mapaIdx = 0;
 	let grade: string[] = [];
 	let explorado: boolean[] = [];
@@ -448,6 +385,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let nivelPendente = 0;
 	let semFog = false; // lobby: tudo visível, sem névoa
 	let zonaLobby: "mapas" | "encant" | "rank" | undefined = undefined;
+	let zonaDwell = 0;
+	let zonaFired = false;
 	let placarAberto = false;
 	let telaPlacar: Frame | undefined = undefined;
 	let colPlacarNv: TextLabel | undefined = undefined;
@@ -542,10 +481,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			teclaEsq = apertou;
 		} else if (codigo === Enum.KeyCode.D || codigo === Enum.KeyCode.Right) {
 			teclaDir = apertou;
-		} else if (apertou && (codigo === Enum.KeyCode.LeftShift || codigo === Enum.KeyCode.L)) {
-			if (estado === "jogo" && painelAberto === undefined) {
-				enviarEntrada(envDx, envDy, envAx, envAy, envFogo, envAuto, true);
-			}
 		} else if (apertou && codigo === Enum.KeyCode.E) {
 			if (estado === "jogo" && painelAberto === undefined) {
 				autoTiro = !autoTiro;
@@ -565,6 +500,12 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (input.UserInputType === Enum.UserInputType.MouseButton1) {
 			if (!processado && painelAberto === undefined) {
 				fogoMouse = true;
+			}
+			return;
+		}
+		if (input.UserInputType === Enum.UserInputType.MouseButton2) {
+			if (!processado && painelAberto === undefined) {
+				enviarEntrada(envDx, envDy, envAx, envAy, envFogo, envAuto, true);
 			}
 			return;
 		}
@@ -801,7 +742,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	function abrirSeletor(): void {
 		atualizarSeletor();
-		telaMenu.Visible = false;
 		telaFim.Visible = false;
 		telaMapas.Visible = true;
 		estado = "mapas";
@@ -809,7 +749,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	function entrarNoMapa(idx: number): void {
 		telaMapas.Visible = false;
-		telaMenu.Visible = false;
 		telaFim.Visible = false;
 		telaJogo.Visible = true;
 		estado = "jogo";
@@ -830,6 +769,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		mostrarBanner("CARREGANDO MASMORRA...", 9999);
 		Remotes.Client.Get("EscolherMapa").SendToServer(idx);
 		zonaLobby = undefined;
+		zonaDwell = 0;
+		zonaFired = false;
+		esconderFill();
 		if (placarAberto) {
 			fecharPlacar();
 		}
@@ -838,7 +780,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	function entrarNoLobby(): void {
 		telaMapas.Visible = false;
-		telaMenu.Visible = false;
 		telaFim.Visible = false;
 		telaJogo.Visible = true;
 		estado = "jogo";
@@ -881,7 +822,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaFim.Visible = true;
 	}
 
-	btnJogar.Activated.Connect(() => entrarNoLobby());
 	for (let i = 0; i < slotsMapa.size(); i++) {
 		const idx = i;
 		slotsMapa[idx].Activated.Connect(() => {
@@ -903,14 +843,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	btnDeNovo.Activated.Connect(() => entrarNoMapa(mapaIdx));
 	btnLobby.Activated.Connect(() => {
 		Remotes.Client.Get("Lobby").SendToServer();
-	});
-	btnMenu.Activated.Connect(() => {
-		limparEntidades();
-		estado = "menu";
-		telaFim.Visible = false;
-		telaJogo.Visible = false;
-		telaMapas.Visible = false;
-		telaMenu.Visible = true;
 	});
 
 	// ===== Rede: snapshots + eventos =====
@@ -1170,6 +1102,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		nivelPendente = 0;
 		limparZonas();
 		zonaLobby = undefined;
+		zonaDwell = 0;
+		zonaFired = false;
+		esconderFill();
 		if (placarAberto) {
 			fecharPlacar();
 		}
@@ -1430,6 +1365,51 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		zonaFrames.clear();
 	}
 
+	function desenharFill(idZona: string, p: number): void {
+		let pad: { wx: number; wy: number; ww: number; wh: number } | undefined = undefined;
+		for (const z of LOBBY_ZONAS) {
+			if (z.id === idZona) {
+				pad = padDaZona(z);
+				break;
+			}
+		}
+		if (pad === undefined) {
+			return;
+		}
+		const m = 4;
+		const x0 = pad.wx - m;
+		const y0 = pad.wy - m;
+		const w = pad.ww + m * 2;
+		const h = pad.wh + m * 2;
+		let resto = p * 2 * (w + h);
+		const segTop = math.min(resto, w);
+		resto -= segTop;
+		const segDir = math.min(resto, h);
+		resto -= segDir;
+		const segBot = math.min(resto, w);
+		resto -= segBot;
+		const segEsq = math.min(resto, h);
+		const barras = [
+			[segTop, 6, x0, y0],
+			[6, segDir, x0 + w - 6, y0],
+			[segBot, 6, x0 + w - segBot, y0 + h - 6],
+			[6, segEsq, x0, y0 + h - segEsq],
+		];
+		for (let k = 0; k < 4; k++) {
+			const b = fillBorda[k];
+			const s = barras[k];
+			b.Size = new UDim2(0, s[0], 0, s[1]);
+			b.Position = new UDim2(0, tX(s[2]), 0, tY(s[3]));
+			b.Visible = s[0] > 0.5 && s[1] > 0.5;
+		}
+	}
+
+	function esconderFill(): void {
+		for (const b of fillBorda) {
+			b.Visible = false;
+		}
+	}
+
 	function abrirPlacar(): void {
 		if (telaPlacar === undefined) {
 			const tp = novoQuadro(
@@ -1636,30 +1616,39 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		desenharTiles();
 		debug.profileend();
 
-		// Zonas do lobby: selo pequeno + botão de ação ao pisar (por tipo de área)
+		// Zonas do lobby: ficar 3s no selo preenche a borda e abre (sair cancela)
 		if (foto.lobby) {
 			const zona = zonaLobbyEm(math.floor(foto.px / TILE), math.floor(foto.py / TILE));
 			if (zona !== zonaLobby) {
 				zonaLobby = zona;
-				if (zona === undefined) {
-					btnZona.Visible = false;
-					if (placarAberto) {
-						fecharPlacar();
+				zonaDwell = 0;
+				zonaFired = false;
+				esconderFill();
+				if (zona === undefined && placarAberto) {
+					fecharPlacar();
+				}
+			}
+			if (zonaLobby !== undefined && !zonaFired) {
+				zonaDwell += dt;
+				const prog = math.min(zonaDwell / 3, 1);
+				desenharFill(zonaLobby, prog);
+				if (prog >= 1) {
+					zonaFired = true;
+					esconderFill();
+					if (zonaLobby === "mapas") {
+						abrirSeletor();
+					} else if (zonaLobby === "encant") {
+						mostrarBanner("ENCANTAMENTO — EM BREVE! Novos poderes a caminho...", 2.5);
+					} else if (zonaLobby === "rank") {
+						Remotes.Client.Get("Placar").SendToServer();
+						abrirPlacar();
 					}
-				} else {
-					btnZona.Text = zona === "mapas" ? "▶ JOGAR" : zona === "rank" ? "VER PLACAR" : "VER";
-					btnZona.Visible = true;
 				}
 			}
 			for (const z of zonaFrames) {
 				z.rect.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy));
 				z.rotulo.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy) + z.wh / 2 - 14);
-				if (z.id === zonaLobby) {
-					btnZona.Position = new UDim2(0, tX(z.wx) + z.ww / 2 - 90, 0, tY(z.wy) + z.wh + 6);
-				}
 			}
-		} else if (btnZona.Visible) {
-			btnZona.Visible = false;
 		}
 
 		// Jogador local
@@ -1844,5 +1833,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	});
 
+	entrarNoLobby();
 	print("[PixelQuest] Cliente renderer pronto (tudo simulado no servidor).");
 }

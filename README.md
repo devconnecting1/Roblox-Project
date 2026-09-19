@@ -7,7 +7,7 @@ RPG top-down bullet-hell estilo Realm of the Mad God.
 **O loop:** explore a masmorra em todas as direções → desvie dos projéteis rosas →
 limpe cada área para abrir as portas → derrote a **Sereia da Praia** na área 5.
 Morreu? Ganha **Valor** para a próxima run (roguelike).
-- **Lobby (3 áreas, sem fog):** JOGAR entra no lobby (mundo único por servidor — a party fica junta); selo pequeno no chão com botão de ação ao pisar — **MAPAS** abre o seletor (▶ JOGAR), **ENCANTAMENTO** mostra em breve, **LEADERBOARDS** abre o top 20 global de Nível/Matança/Moedas (OrderedDataStores, cache 60s); fim de run tem botão LOBBY (regen + todos juntos)
+- **Lobby (3 áreas, sem fog, sem tela de menu):** entra direto no lobby (mundo único por servidor — a party fica junta); fique **3s no selo** (a borda preenche em volta; sair cancela) — **MAPAS** abre o seletor, **ENCANTAMENTO** mostra em breve, **LEADERBOARDS** abre o top 20 global de Nível/Matança/Moedas (OrderedDataStores, cache 60s); fim de run tem botão LOBBY (regen + todos juntos)
 
 - Engine: [roblox-ts](https://roblox-ts.com/) 3.x (TypeScript → Luau)
 - Sync/build: [Rojo](https://rojo.space/) 7.7.0 (`servePort: 34872`)
@@ -72,7 +72,7 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **Fontes:** `FontFace` Gotham em toda UI + contorno em todo texto; p/ Geist similar, suba o TTF (Creator Dashboard → Fonts) e ponha o ID em `FONTE_ID` (`src/client/jogo.ts`)
 - **ZIndex à prova de regressão:** `ZIndexBehavior=Sibling` + camadas (mapa 1–20, HUD 50+, painel 65, telas 70) — HUD nunca mais fica atrás de tile
 - **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (tiro único!), **Caranguejo Apressado** (rápido), **Água-Viva** (leque de 3), **Tubarão** (perseguidor frenético) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell); metralhadora dos dois lados com TTK preservado (dano por bala menor, HP compensado)
-- **Controles (PC):** WASD/setas movem, **mouse mira**, BOTÃO ESQ segurado atira, E liga/desliga tiro automático no mouse, SHIFT/L = dash (invencibilidade breve), P pausa individual, ≡ OPÇÕES = tarefas/mochila/equip/títulos (pausa só você)
+- **Controles (PC):** WASD/setas movem, **mouse mira**, BOTÃO ESQ segurado atira, E liga/desliga tiro automático no mouse, BOTÃO DIR = dash (invencibilidade breve), P pausa individual, ≡ OPÇÕES = tarefas/mochila/equip/títulos (pausa só você)
 - **HUD do jogador sob o personagem:** plaquinha com username + barra de vida + barra de XP + nível + **título equipado** (aba TÍTULOS no painel; "Apoiador Inicial" liberado); o olho branco do sprite aponta para a mira; **inimigos mostram Nv (área+1)** abaixo deles
 - **Visibilidade vs. botões nativos:** HUD do topo começa em x=175/y=36 (longe do ☰/chat e do placar), abaixo da topbar nativa
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
