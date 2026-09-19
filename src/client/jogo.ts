@@ -54,8 +54,6 @@ const COR_XP = Color3.fromRGB(88, 140, 255);
 const COR_BALA_INIMIGA = Color3.fromRGB(255, 70, 180);
 const COR_DESCONHECIDO = Color3.fromRGB(8, 10, 14);
 const TOPO_Y = 36; // abaixo da topbar nativa do Roblox
-const MAX_BALAS_POOL = 80;
-const MAX_COTS_POOL = 50;
 
 const COR_ESCURA: { [chave: string]: Color3 } = {};
 for (const ch of ["W", "~", ".", ",", "G", "T", "*", "R", "D"]) {
@@ -533,8 +531,10 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let chavesInimigos: number[] = [];
 	let entOutros: { [nome: string]: EntFrame } = {};
 	let chavesOutros: string[] = [];
-	const poolBalas: Frame[] = [];
-	const poolCots: { frame: Frame; id: number }[] = [];
+	let entBalas: { [id: number]: EntFrame | undefined } = {};
+	let chavesBalas: number[] = [];
+	let entCots: { [id: number]: EntFrame | undefined } = {};
+	let chavesCots: number[] = [];
 	const flutuantes: Flutuante[] = [];
 
 	// Input PC (só envia; servidor decide)
@@ -1058,13 +1058,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		entOutros = {};
 		chavesOutros = [];
-		for (const f of poolBalas) {
-			f.Visible = false;
+		for (const id of chavesBalas) {
+			const ent = entBalas[id];
+			if (ent !== undefined) {
+				ent.frame.Destroy();
+			}
 		}
-		for (const c of poolCots) {
-			c.frame.Visible = false;
-			c.id = -1;
+		entBalas = {};
+		chavesBalas = [];
+		for (const id of chavesCots) {
+			const ent = entCots[id];
+			if (ent !== undefined) {
+				ent.frame.Destroy();
+			}
 		}
+		entCots = {};
+		chavesCots = [];
 		for (const f of flutuantes) {
 			f.label.Destroy();
 		}
@@ -1087,19 +1096,44 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		plRY = 0;
 	}
 
-	// Pools de balas/coletáveis (reuso por índice)
-	for (let i = 0; i < MAX_BALAS_POOL; i++) {
-		const f = novoQuadro(arena, `PB${i}`, new UDim2(0, 9, 0, 9), new UDim2(0, -50, 0, -50), COR_TEXTO, 0);
-		f.ZIndex = 7;
-		f.Visible = false;
-		poolBalas.push(f);
+	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
+	function obterBala(id: number, tam: number, amiga: boolean): EntFrame {
+		let ent = entBalas[id];
+		if (ent === undefined) {
+			const f = novoQuadro(
+				arena,
+				`B${id}`,
+				new UDim2(0, tam, 0, tam),
+				new UDim2(0, -50, 0, -50),
+				amiga ? CLASSES[0].cor : COR_BALA_INIMIGA,
+				0,
+			);
+			f.ZIndex = 7;
+			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
+			entBalas[id] = ent;
+			chavesBalas.push(id);
+		}
+		return ent;
 	}
-	for (let i = 0; i < MAX_COTS_POOL; i++) {
-		const f = novoQuadro(arena, `PC${i}`, new UDim2(0, 12, 0, 12), new UDim2(0, -50, 0, -50), COR_DESTAQUE, 0);
-		f.ZIndex = 5;
-		borda(f, Color3.fromRGB(10, 10, 10), 1);
-		f.Visible = false;
-		poolCots.push({ frame: f, id: -1 });
+
+	function obterCot(id: number, tipo: string): EntFrame {
+		let ent = entCots[id];
+		if (ent === undefined) {
+			const f = novoQuadro(
+				arena,
+				`C${id}`,
+				new UDim2(0, 12, 0, 12),
+				new UDim2(0, -50, 0, -50),
+				tipo === "moeda" ? COR_DESTAQUE : COR_PERIGO,
+				0,
+			);
+			f.ZIndex = 5;
+			borda(f, Color3.fromRGB(10, 10, 10), 1);
+			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
+			entCots[id] = ent;
+			chavesCots.push(id);
+		}
+		return ent;
 	}
 
 	// ===== Quests / painel (espelho do servidor) =====
@@ -1246,13 +1280,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	});
 
 	// ===== Loop de render =====
-	function suavizar(ent: EntFrame, x: number, y: number, dt: number): void {
+	function suavizar(ent: EntFrame, x: number, y: number, dt: number, forca = 14): void {
 		if (ent.rx === 0 && ent.ry === 0) {
 			ent.rx = x;
 			ent.ry = y;
 			return;
 		}
-		const k = 1 - math.exp(-14 * dt);
+		const k = 1 - math.exp(-forca * dt);
 		ent.rx += (x - ent.rx) * k;
 		ent.ry += (y - ent.ry) * k;
 	}
@@ -1417,28 +1451,43 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			}
 		}
 
-		// Balas e coletáveis (pool por índice)
-		for (let i = 0; i < poolBalas.size(); i++) {
-			const f = poolBalas[i];
-			if (i < foto.balas.size()) {
-				const b = foto.balas[i];
-				f.Size = new UDim2(0, b.tam, 0, b.tam);
-				f.BackgroundColor3 = b.amiga ? CLASSES[0].cor : COR_BALA_INIMIGA;
-				f.Position = new UDim2(0, tX(b.x) - b.tam / 2, 0, tY(b.y) - b.tam / 2);
-				f.Visible = true;
-			} else {
-				f.Visible = false;
+		// Balas e coletáveis por ID (interpolados como o resto)
+		const balasVistas: { [id: number]: boolean } = {};
+		for (const b of foto.balas) {
+			balasVistas[b.id] = true;
+			const ent = obterBala(b.id, b.tam, b.amiga);
+			suavizar(ent, b.x, b.y, dt, 30);
+			ent.frame.Position = new UDim2(0, tX(ent.rx) - b.tam / 2, 0, tY(ent.ry) - b.tam / 2);
+			ent.frame.Visible = true;
+		}
+		for (let k = chavesBalas.size() - 1; k >= 0; k--) {
+			const id = chavesBalas[k];
+			if (!balasVistas[id]) {
+				const ent = entBalas[id];
+				if (ent !== undefined) {
+					ent.frame.Destroy();
+				}
+				delete entBalas[id];
+				chavesBalas.remove(k);
 			}
 		}
-		for (let i = 0; i < poolCots.size(); i++) {
-			const c = poolCots[i];
-			if (i < foto.cots.size()) {
-				const cot = foto.cots[i];
-				c.frame.BackgroundColor3 = cot.tipo === "moeda" ? COR_DESTAQUE : COR_PERIGO;
-				c.frame.Position = new UDim2(0, tX(cot.x) - 6, 0, tY(cot.y) - 6);
-				c.frame.Visible = true;
-			} else {
-				c.frame.Visible = false;
+		const cotsVistos: { [id: number]: boolean } = {};
+		for (const cot of foto.cots) {
+			cotsVistos[cot.id] = true;
+			const ent = obterCot(cot.id, cot.tipo);
+			suavizar(ent, cot.x, cot.y, dt, 18);
+			ent.frame.Position = new UDim2(0, tX(ent.rx) - 6, 0, tY(ent.ry) - 6);
+			ent.frame.Visible = true;
+		}
+		for (let k = chavesCots.size() - 1; k >= 0; k--) {
+			const id = chavesCots[k];
+			if (!cotsVistos[id]) {
+				const ent = entCots[id];
+				if (ent !== undefined) {
+					ent.frame.Destroy();
+				}
+				delete entCots[id];
+				chavesCots.remove(k);
 			}
 		}
 

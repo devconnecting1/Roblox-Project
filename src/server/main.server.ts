@@ -35,8 +35,8 @@ Remotes.Server.Get("Entrada").Connect((player, entrada) => {
 	aplicarEntrada(player, entrada);
 });
 
-Remotes.Server.Get("Pausa").Connect(() => {
-	alternarPausa();
+Remotes.Server.Get("Pausa").Connect((player) => {
+	alternarPausa(player);
 });
 
 Remotes.Server.Get("Equipar").Connect((player, id) => {

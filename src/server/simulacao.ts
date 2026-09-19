@@ -72,6 +72,7 @@ interface InimigoS {
 }
 
 interface BalaS {
+	id: number;
 	x: number;
 	y: number;
 	vx: number;
@@ -125,6 +126,7 @@ export interface JogadorS {
 	dirX: number;
 	dirY: number;
 	morto: boolean;
+	pausado: boolean; // pausa individual (multiplayer: um pausa sem congelar os outros)
 }
 
 interface Mundo {
@@ -138,7 +140,6 @@ interface Mundo {
 	cots: CotS[];
 	jogadores: Map<Player, JogadorS>;
 	tempo: number;
-	pausado: boolean;
 	bossVivo: boolean;
 	bossMorto: boolean;
 	proxId: number;
@@ -157,7 +158,6 @@ export const mundo: Mundo = {
 	cots: [],
 	jogadores: new Map(),
 	tempo: 0,
-	pausado: false,
 	bossVivo: false,
 	bossMorto: false,
 	proxId: 1,
@@ -331,6 +331,7 @@ function novoJogador(player: Player, nasc: [number, number]): JogadorS {
 		dirX: 0,
 		dirY: 0,
 		morto: false,
+		pausado: false,
 	};
 }
 
@@ -462,7 +463,7 @@ export function removerSlot(player: Player, slot: string): void {
 // ---------- Inputs (validados + normalizados: sem speed hack) ----------
 export function aplicarEntrada(player: Player, e: EntradaPayload): void {
 	const js = mundo.jogadores.get(player);
-	if (js === undefined || js.morto || mundo.pausado) {
+	if (js === undefined || js.morto || js.pausado) {
 		return;
 	}
 	let dx = e.dx;
@@ -483,8 +484,11 @@ export function aplicarEntrada(player: Player, e: EntradaPayload): void {
 	}
 }
 
-export function alternarPausa(): void {
-	mundo.pausado = !mundo.pausado;
+export function alternarPausa(player: Player): void {
+	const js = mundo.jogadores.get(player);
+	if (js !== undefined && !js.morto) {
+		js.pausado = !js.pausado;
+	}
 }
 
 // ---------- Combate ----------
@@ -701,9 +705,10 @@ function alertarAliados(px: number, py: number, excetoId: number): void {
 // ---------- Update ----------
 const MAX_BALAS = 160;
 /** Push com teto (anti-spam/lag: descarta excedente). */
-function empurrarBala(b: BalaS): void {
+function empurrarBala(b: Omit<BalaS, "id">): void {
 	if (mundo.balas.size() < MAX_BALAS) {
-		mundo.balas.push(b);
+		mundo.proxId++;
+		mundo.balas.push({ ...b, id: mundo.proxId });
 	}
 }
 
@@ -711,9 +716,7 @@ export function atualizar(dt: number): void {
 	if (!mundo.ativo || mundo.jogadores.size() === 0) {
 		return; // sem jogadores, sem simulação (economiza CPU)
 	}
-	if (mundo.pausado) {
-		return;
-	}
+	// Sem pausa global: cada jogador pausa só o seu (multiplayer)
 	if (dt > 0.1) {
 		dt = 0.1;
 	}
@@ -723,7 +726,7 @@ export function atualizar(dt: number): void {
 
 	// Jogadores: movimento (deslizamento) + tiro automático
 	for (const [, js] of mundo.jogadores) {
-		if (js.morto) {
+		if (js.morto || js.pausado) {
 			continue;
 		}
 		let vel = c.velocidade;
@@ -801,7 +804,7 @@ export function atualizar(dt: number): void {
 		let avistado: JogadorS | undefined = undefined;
 		let avistD = ALCANCE_VISAO * ALCANCE_VISAO;
 		for (const [, js] of mundo.jogadores) {
-			if (js.morto) {
+			if (js.morto || js.pausado) {
 				continue;
 			}
 			const dd = dist2(e.x, e.y, js.x, js.y);
@@ -887,7 +890,7 @@ export function atualizar(dt: number): void {
 		}
 		// Contato com qualquer jogador vivo
 		for (const [, js] of mundo.jogadores) {
-			if (js.morto) {
+			if (js.morto || js.pausado) {
 				continue;
 			}
 			if (dist2(e.x, e.y, js.x, js.y) < (e.info.tamanho / 2 + 10) * (e.info.tamanho / 2 + 10)) {
@@ -1011,7 +1014,7 @@ export function atualizar(dt: number): void {
 				}
 			} else {
 				for (const [, js] of mundo.jogadores) {
-					if (js.morto) {
+					if (js.morto || js.pausado) {
 						continue;
 					}
 					const rr = b.tam / 2 + 10;
@@ -1036,7 +1039,7 @@ export function atualizar(dt: number): void {
 		col.vx *= 1 - 3 * dt;
 		col.vy *= 1 - 3 * dt;
 		const dono = jogadorMaisProximo(col.x, col.y);
-		if (dono !== undefined) {
+		if (dono !== undefined && !dono.pausado) {
 			const d2 = dist2(col.x, col.y, dono.x, dono.y);
 			if (d2 < 80 * 80) {
 				const d = math.sqrt(d2);
@@ -1118,7 +1121,7 @@ function enviarFoto(js: JogadorS): void {
 		if (!visivelPara(js, b.x, b.y)) {
 			continue;
 		}
-		fbalas.push({ x: b.x, y: b.y, amiga: b.amiga, tam: b.tam });
+		fbalas.push({ id: b.id, x: b.x, y: b.y, amiga: b.amiga, tam: b.tam });
 	}
 	const fcots: Foto["cots"] = [];
 	for (const c of mundo.cots) {
@@ -1173,7 +1176,7 @@ function enviarFoto(js: JogadorS): void {
 		eqArma: js.eqArma !== undefined ? js.eqArma.id : "",
 		eqArmadura: js.eqArmadura !== undefined ? js.eqArmadura.id : "",
 		eqAcess: js.eqAcess !== undefined ? js.eqAcess.id : "",
-		pausado: mundo.pausado,
+		pausado: js.pausado,
 		areasAbertas: areas,
 	};
 	Remotes.Server.Get("Foto").SendToPlayer(js.player, foto);

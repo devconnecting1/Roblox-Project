@@ -351,6 +351,7 @@ export interface FotoInimigo {
 }
 
 export interface FotoBala {
+	id: number;
 	x: number;
 	y: number;
 	amiga: boolean;
