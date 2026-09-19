@@ -2,18 +2,25 @@
  * Dados do Pixel Quest 2D — inspirado no RPG 2D bullet-hell do Roblox
  * (Realm-like: explorar, desviar de projéteis, loot, XP, quests, boss).
  *
- * Tudo aqui é dado puro (sem dependência de engine), então pode ser
- * usado pelo servidor e pelo cliente.
+ * Arquitetura anti-cheat: o SERVIDOR é autoridade de tudo (posição, dano,
+ * inimigos, loot, portas). O cliente só renderiza e envia inputs. Tudo aqui
+ * é dado puro + tipos de protocolo, usável dos dois lados.
  */
 
-// ---------- Mundo aberto (explorável, câmera segue o jogador) ----------
-// Tiles: `W` oceano (sólido) | `~` água rasa | `.` areia | `,` areia clara
-//        `G` grama | `T` palmeira | `*` moita | `R` rocha (sólida)
+// ---------- Mundo (quadrado, procedural no servidor) ----------
+// Tiles: `W` (sólido) | `~` água | `.`/`,` chão | `G` pedra | `T` tocha
+//        `*` musgo | `R` parede (sólida) | `D` porta trancada (sólida)
 export const MUNDO_L = 2400;
-export const MUNDO_A = 1536;
+export const MUNDO_A = 2400;
 export const TILE = 48;
 export const MUNDO_TX = 50; // MUNDO_L / TILE
-export const MUNDO_TY = 32; // MUNDO_A / TILE
+export const MUNDO_TY = 50; // MUNDO_A / TILE
+
+/** Raio de visão do Fog of War (px). */
+export const VISAO = 340;
+
+/** Total de áreas da masmorra (última = boss). */
+export const TOTAL_AREAS = 5;
 
 export const COR_TILE: { [chave: string]: Color3 } = {
 	W: Color3.fromRGB(30, 90, 160),
@@ -24,122 +31,11 @@ export const COR_TILE: { [chave: string]: Color3 } = {
 	T: Color3.fromRGB(230, 126, 34),
 	"*": Color3.fromRGB(70, 130, 90),
 	R: Color3.fromRGB(58, 61, 68),
+	D: Color3.fromRGB(94, 234, 212),
 };
 
-/** Geração da masmorra (dungeon crawler): salas retangulares ligadas por
- * corredores em L, com tochas e musgo de decoração. Grade refeita a cada run. */
-interface Sala {
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	cx: number;
-	cy: number;
-}
-
-let grade: string[][] = [];
-let nascSala: [number, number] = [MUNDO_L / 2, MUNDO_A / 2];
-
-function porChao(tx: number, ty: number): void {
-	if (tx < 1 || ty < 1 || tx >= MUNDO_TX - 1 || ty >= MUNDO_TY - 1) {
-		return;
-	}
-	grade[ty][tx] = (tx + ty) % 9 === 0 ? "," : ".";
-}
-
-function escavarCorredor(ax: number, ay: number, bx: number, by: number): void {
-	const x1 = ax < bx ? ax : bx;
-	const x2 = ax < bx ? bx : ax;
-	for (let x = x1; x <= x2; x++) {
-		porChao(x, ay);
-		porChao(x, ay + 1);
-	}
-	const y1 = ay < by ? ay : by;
-	const y2 = ay < by ? by : ay;
-	for (let y = y1; y <= y2; y++) {
-		porChao(bx, y);
-		porChao(bx + 1, y);
-	}
-}
-
-export function gerarMasmorra(): void {
-	grade = [];
-	for (let ty = 0; ty < MUNDO_TY; ty++) {
-		const linha: string[] = [];
-		for (let tx = 0; tx < MUNDO_TX; tx++) {
-			linha.push("R");
-		}
-		grade.push(linha);
-	}
-	const salas: Sala[] = [];
-	for (let t = 0; t < 80 && salas.size() < 12; t++) {
-		const w = 5 + math.floor(math.random() * 5);
-		const h = 4 + math.floor(math.random() * 4);
-		const x = 2 + math.floor(math.random() * (MUNDO_TX - w - 4));
-		const y = 2 + math.floor(math.random() * (MUNDO_TY - h - 4));
-		let ok = true;
-		for (const s of salas) {
-			if (x < s.x + s.w + 1 && x + w + 1 > s.x && y < s.y + s.h + 1 && y + h + 1 > s.y) {
-				ok = false;
-				break;
-			}
-		}
-		if (!ok) {
-			continue;
-		}
-		const cx = x + math.floor(w / 2);
-		const cy = y + math.floor(h / 2);
-		salas.push({ x: x, y: y, w: w, h: h, cx: cx, cy: cy });
-		for (let yy = y; yy < y + h; yy++) {
-			for (let xx = x; xx < x + w; xx++) {
-				porChao(xx, yy);
-			}
-		}
-	}
-	if (salas.size() === 0) {
-		// Fallback (praticamente impossível): sala central
-		for (let yy = 13; yy < 21; yy++) {
-			for (let xx = 20; xx < 30; xx++) {
-				porChao(xx, yy);
-			}
-		}
-		salas.push({ x: 20, y: 13, w: 10, h: 8, cx: 25, cy: 17 });
-	}
-	for (let i = 1; i < salas.size(); i++) {
-		escavarCorredor(salas[i - 1].cx, salas[i - 1].cy, salas[i].cx, salas[i].cy);
-	}
-	// Decoração: tochas junto à parede, musgo no chão
-	for (let ty = 2; ty < MUNDO_TY - 2; ty++) {
-		for (let tx = 2; tx < MUNDO_TX - 2; tx++) {
-			const ch = grade[ty][tx];
-			if (ch !== "." && ch !== ",") {
-				continue;
-			}
-			const r = math.random();
-			const pertoParede =
-				grade[ty - 1][tx] === "R" || grade[ty + 1][tx] === "R" || grade[ty][tx - 1] === "R" || grade[ty][tx + 1] === "R";
-			if (r < 0.04 && pertoParede) {
-				grade[ty][tx] = "T";
-			} else if (r < 0.12) {
-				grade[ty][tx] = "*";
-			}
-		}
-	}
-	const s0 = salas[0];
-	nascSala = [(s0.cx + 0.5) * TILE, (s0.cy + 0.5) * TILE];
-}
-
-/** Tile da masmorra atual (fora da grade = parede). */
-export function tileNoMundo(tx: number, ty: number): string {
-	if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY || grade.size() === 0) {
-		return "R";
-	}
-	return grade[ty][tx];
-}
-
-/** Ponto de nascimento: centro da primeira sala (entrada da dungeon). */
-export function pontoNascimento(): [number, number] {
-	return nascSala;
+export function eSolido(ch: string): boolean {
+	return ch === "W" || ch === "R" || ch === "D";
 }
 
 // ---------- Mapas (seletor: 5 slots, desbloqueio por nível da conta) ----------
@@ -157,49 +53,6 @@ export const MAPAS: MapaInfo[] = [
 	{ nome: "???", descricao: "Em breve.", reqNivel: 40 },
 ];
 
-export function eSolido(ch: string): boolean {
-	return ch === "W" || ch === "R";
-}
-
-/** Retorna true se o círculo (x, y, raio) encosta em tile sólido. */
-export function areaSolida(x: number, y: number, raio: number): boolean {
-	const tx1 = math.floor((x - raio) / TILE);
-	const tx2 = math.floor((x + raio) / TILE);
-	const ty1 = math.floor((y - raio) / TILE);
-	const ty2 = math.floor((y + raio) / TILE);
-	for (let tx = tx1; tx <= tx2; tx++) {
-		for (let ty = ty1; ty <= ty2; ty++) {
-			if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
-				return true;
-			}
-			if (eSolido(tileNoMundo(tx, ty))) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/** Procura ponto caminhável perto de (x, y): espiral determinística. */
-export function acharChaoPerto(x: number, y: number, raio: number): [number, number] {
-	if (!areaSolida(x, y, raio)) {
-		return [x, y];
-	}
-	let passo = TILE;
-	while (passo < 600) {
-		for (let k = 0; k < 8; k++) {
-			const a = (k / 8) * math.pi * 2;
-			const cx = x + math.cos(a) * passo;
-			const cy = y + math.sin(a) * passo;
-			if (cx > 60 && cy > 60 && cx < MUNDO_L - 60 && cy < MUNDO_A - 60 && !areaSolida(cx, cy, raio)) {
-				return [cx, cy];
-			}
-		}
-		passo += TILE;
-	}
-	return [MUNDO_L / 2, MUNDO_A / 2];
-}
-
 // ---------- Classe única (por enquanto) ----------
 export interface ClasseInfo {
 	nome: string;
@@ -216,7 +69,7 @@ export interface ClasseInfo {
 export const CLASSES: ClasseInfo[] = [
 	{
 		nome: "Aventureiro",
-		descricao: "Equilibrado e corajoso. Pronto para a ilha.",
+		descricao: "Equilibrado e corajoso. Pronto para a masmorra.",
 		hpMax: 42,
 		dano: 9,
 		cadencia: 0.3,
@@ -271,7 +124,14 @@ export const LOOT_BOSS: ItemInfo[] = [
 	{ id: "cota_malha", nome: "Cota de Malha", slot: "armadura", dano: 0, hp: 20, descricao: "+20 de HP máx. Loot da Sereia.", preco: 30 },
 ];
 
-// ---------- Inimigos do bioma ----------
+const TODOS_ITENS: ItemInfo[] = [ITENS_INICIAIS[0], ITENS_INICIAIS[1], LOOT_COMUM[0], LOOT_COMUM[1], ANEL_VALOR, LOOT_BOSS[0], LOOT_BOSS[1]];
+
+export const ITEM_POR_ID: { [id: string]: ItemInfo } = {};
+for (const it of TODOS_ITENS) {
+	ITEM_POR_ID[it.id] = it;
+}
+
+// ---------- Inimigos ----------
 export interface InimigoInfo {
 	nome: string;
 	hp: number;
@@ -352,12 +212,17 @@ export const BOSS: InimigoInfo = {
 	danoBala: 7,
 };
 
-// ---------- Ondas ----------
-export const ONDA_BOSS = 5;
+/** Inimigos por área (0–3; área 4 = boss). */
+export const INIMIGOS_POR_AREA: number[] = [6, 7, 8, 9];
 
-/** Quantidade de inimigos (não-chefe) por onda. */
-export function inimigosDaOnda(onda: number): number {
-	return 3 + onda * 2;
+/** Tipos desbloqueados por área (índices em INIMIGOS). */
+export function tiposPorArea(area: number): number[] {
+	if (area < 1) {
+		return [0];
+	} else if (area < 2) {
+		return [0, 1];
+	}
+	return [0, 1, 2];
 }
 
 // ---------- Quests (estilo "Derrote 11...") ----------
@@ -376,7 +241,7 @@ export interface QuestInfo {
 export const QUESTS: QuestInfo[] = [
 	{
 		id: "limpeza",
-		nome: "Limpeza da Praia",
+		nome: "Limpeza da Masmorra",
 		descricao: "Derrote 8 inimigos",
 		meta: 8,
 		xp: 35,
@@ -408,7 +273,7 @@ export function xpParaNivel(nivel: number): number {
 	return 20 + (nivel - 1) * 15;
 }
 
-/** Valor (moeda de derrota roguelike) ganho ao fim da run. */
+/** Valor (moeda roguelike) ganho ao fim da run. */
 export function calcularValor(moedas: number, questsCompletas: number, venceu: boolean): number {
 	let valor = math.floor(moedas / 10) + questsCompletas * 5;
 	if (venceu) {
@@ -416,3 +281,86 @@ export function calcularValor(moedas: number, questsCompletas: number, venceu: b
 	}
 	return valor;
 }
+
+// ---------- Protocolo rede (cliente↔servidor, via @rbxts/net) ----------
+export interface EntradaPayload {
+	dx: number; // -1..1
+	dy: number; // -1..1
+	dash: boolean; // borda de subida: servidor aplica se cooldown ok
+}
+
+export interface FotoInimigo {
+	id: number;
+	x: number;
+	y: number;
+	hp: number;
+	hpMax: number;
+	tam: number;
+	boss: boolean;
+	r: number;
+	g: number;
+	b: number;
+}
+
+export interface FotoBala {
+	x: number;
+	y: number;
+	amiga: boolean;
+	tam: number;
+}
+
+export interface FotoCot {
+	id: number;
+	x: number;
+	y: number;
+	tipo: string; // "moeda" | "coracao"
+}
+
+export interface FotoJogador {
+	nome: string;
+	x: number;
+	y: number;
+	nv: number;
+	r: number;
+	g: number;
+	b: number;
+}
+
+export interface FotoQuest {
+	id: string;
+	prog: number;
+	completa: boolean;
+}
+
+export interface Foto {
+	px: number;
+	py: number;
+	hp: number;
+	hpMax: number;
+	nivel: number;
+	xp: number;
+	xpProx: number;
+	moedas: number;
+	dano: number;
+	area: number; // área atual do jogador (0–4)
+	abates: number;
+	inimigos: FotoInimigo[];
+	balas: FotoBala[];
+	cots: FotoCot[];
+	jogadores: FotoJogador[];
+	quests: FotoQuest[];
+	questsCompletas: number;
+	bossFracao: number; // -1 = sem boss à vista
+	mochila: string[];
+	eqArma: string;
+	eqArmadura: string;
+	eqAcess: string;
+	pausado: boolean;
+	areasAbertas: number; // bitmask das áreas liberadas
+}
+
+export type EventoPayload =
+	| { tipo: "mapa"; grade: string[] }
+	| { tipo: "porta"; tx: number; ty: number }
+	| { tipo: "banner"; texto: string; duracao: number }
+	| { tipo: "fim"; venceu: boolean; area: number; nivel: number; abates: number; moedas: number; quests: number; valor: number };

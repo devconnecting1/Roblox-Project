@@ -4,9 +4,9 @@ Jogo **puramente em interfaces 2D** (ScreenGui, zero peças 3D), inspirado no
 [Pixel Quest](https://www.roblox.com/games/80003276594057/Pixel-Quest) do Roblox:
 RPG top-down bullet-hell estilo Realm of the Mad God.
 
-**O loop:** mova-se em todas as direções → desvie dos projéteis rosas →
-derrote inimigos → colete moedas → suba de nível → complete quests →
-vença a **Sereia da Praia** na onda 5. Morreu? Ganha **Valor** para a próxima run (roguelike).
+**O loop:** explore a masmorra em todas as direções → desvie dos projéteis rosas →
+limpe cada área para abrir as portas → derrote a **Sereia da Praia** na área 5.
+Morreu? Ganha **Valor** para a próxima run (roguelike).
 
 - Engine: [roblox-ts](https://roblox-ts.com/) 3.x (TypeScript → Luau)
 - Sync/build: [Rojo](https://rojo.space/) 7.7.0 (`servePort: 34872`)
@@ -35,9 +35,17 @@ out/                          -> Luau gerado pelo rbxtsc (ignorado no git)
 build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifact no CI)
 ```
 
+## Arquitetura anti-cheat (servidor autoritativo)
+
+- **Servidor** (`src/server/simulacao.ts` + `mundo.ts`): mundo procedural 50×50 em 5 áreas, movimento com colisão, dano, inimigos, balas, loot, quests, portas e XP. Inputs do cliente são validados (`@rbxts/t`: faixa + posse) e normalizados (sem speed hack).
+- **Rede** (`shared/pixelquest/Rede.ts`, `@rbxts/net`): cliente→servidor (`Entrada`, `Pausa`, `Equipar`, `Remover`, `EscolherMapa`); servidor→cliente (`Foto` 15Hz filtrada pelo Fog of War, `Evento` p/ mapa/portas/banners/fim).
+- **Cliente** (`src/client/jogo.ts`): só renderiza (câmera, fog, minimapa, HUD) e envia inputs. Nada de jogo é decidido aqui — trapaça de cliente não tem efeito.
+
 ## O jogo
 
-- **Mundo aberto em tela cheia:** Mapa 1 = **Masmorra Inicial** (dungeon crawler: salas + corredores gerados por run, tochas, rochas com colisão); câmera segue o jogador com culling de tiles + **minimapa** com pontos de inimigos/boss
+- **Mundo quadrado 2400×2400 procedural:** 5 áreas com salas + corredores; portas ciano abrem só ao limpar a área; área 5 tem o boss (spawna ao entrar)
+- **Fog of War:** só o visível é enviado/renderizado; explorado fica escurecido, inexplorado preto; minimapa quadrado revela o mapa + pontos de quem está visível
+- **Sem ondas:** inimigos nascem nos caminhos de cada área; progressão = limpar → avançar
 - **Seletor de mapas (5 slots):** Mapa 1 liberado para todos; Mapas 2–5 mostram `Nv 10/20/30/40 • EM BREVE` (desbloqueio pelo Nível da conta nos leaderstats)
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
 - **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado

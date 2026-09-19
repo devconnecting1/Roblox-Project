@@ -1,30 +1,34 @@
 /**
- * Rede do Pixel Quest 2D — `@rbxts/net` (biblioteca recomendada na doc
- * roblox-ts para tráfego tipado) + validação `@rbxts/t` no servidor.
+ * Rede do Pixel Quest 2D — `@rbxts/net` (remotes tipados) + `@rbxts/t`.
  *
- * Regra da doc (api/roblox-api): tráfego cliente→servidor NÃO é confiável.
- * O Net gera os remotes; o servidor ainda valida o payload estrito
- * antes de tocar nos leaderstats.
+ * Anti-cheat: o servidor NUNCA confia no cliente. Entradas e ações são
+ * validadas (faixa + posse) antes de qualquer efeito; todo estado de jogo
+ * (posição, vida, dano, inimigos, loot, portas) vive só no servidor e desce
+ * via snapshots (`Foto`) + eventos (`Evento`).
  */
 import Net from "@rbxts/net";
 import { t } from "@rbxts/t";
+import { EntradaPayload, EventoPayload, Foto } from "./Dados";
 
-export interface SavePayload {
-	moedas: number;
-	nivel: number;
-	valor: number;
-	vitoria: boolean;
-}
-
-/** Remotes tipados (cliente→servidor). */
+/** Remotes tipados. */
 export const Remotes = Net.Definitions.Create({
-	SalvarRun: Net.Definitions.ClientToServerEvent<[payload: SavePayload]>(),
+	// Cliente → servidor
+	Entrada: Net.Definitions.ClientToServerEvent<[entrada: EntradaPayload]>(),
+	Pausa: Net.Definitions.ClientToServerEvent<[]>(),
+	Equipar: Net.Definitions.ClientToServerEvent<[id: string]>(),
+	Remover: Net.Definitions.ClientToServerEvent<[slot: string]>(),
+	EscolherMapa: Net.Definitions.ClientToServerEvent<[mapa: number]>(),
+	// Servidor → cliente
+	Foto: Net.Definitions.ServerToClientEvent<[foto: Foto]>(),
+	Evento: Net.Definitions.ServerToClientEvent<[ev: EventoPayload]>(),
 });
 
-/** Validador estrito: rejeita campos extras, tipos errados ou fora da faixa. */
-export const eSavePayload = t.strictInterface({
-	moedas: t.numberConstrained(0, 999999),
-	nivel: t.numberConstrained(1, 100),
-	valor: t.numberConstrained(0, 999999),
-	vitoria: t.boolean,
+// ---------- Validadores (servidor) ----------
+export const eEntrada = t.strictInterface({
+	dx: t.numberConstrained(-1, 1),
+	dy: t.numberConstrained(-1, 1),
+	dash: t.boolean,
 });
+
+export const eIdTexto = t.string;
+export const eMapaIdx = t.numberConstrained(0, 4);
