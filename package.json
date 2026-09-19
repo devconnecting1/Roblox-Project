@@ -2,7 +2,7 @@
   "name": "roblox-project",
   "version": "1.0.0",
   "private": true,
-  "description": "Casa 3D de teste feita com roblox-ts + Rojo. Build automático via GitHub Actions.",
+  "description": "Pixel Quest 2D: jogo puramente em interfaces 2D estilo bullet-hell, com roblox-ts + Rojo + Net. Build automático via GitHub Actions.",
   "main": "index.js",
   "scripts": {
     "build": "rbxtsc",
@@ -21,6 +21,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@rbxts/net": "^3.0.10",
     "@rbxts/services": "^1.6.0",
     "@rbxts/t": "^3.2.1"
   }

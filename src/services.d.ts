@@ -1,15 +1,12 @@
 // Tipagem ambiente do DataModel gerenciado pelo Rojo.
-// Padrão recomendado em https://roblox-ts.com/docs/guides/indexing-children
-// Permite acesso tipado e seguro ao Model gerado pelo servidor.
+// Padrão: https://roblox-ts.com/docs/guides/indexing-children
+//
+// Neste jogo (UI 2D pura) o servidor não cria instâncias na Workspace —
+// os remotes são gerados e tipados pelo `@rbxts/net` (`shared/pixelquest/Rede.ts`),
+// então nenhum `interface` ambiente é necessário aqui. Mantemos o arquivo
+// como ponto de extensão: declare filhos fixos do DataModel conforme o jogo crescer.
 //
 // Exemplo:
-//   import { Workspace } from "@rbxts/services";
-//   const casa = Workspace.FindFirstChild("CasaTeste");
-//   if (casa !== undefined && casa.IsA("Model")) { ... }
-//
-// (Acesso direto `Workspace.CasaTeste` só é seguro quando o Model
-//  garantidamente existe — o servidor o destrói e recria a cada build.)
-
-interface Workspace extends Instance {
-	CasaTeste?: Model;
-}
+//   interface ReplicatedStorage extends Instance {
+//       MinhaPasta?: Folder;
+//   }

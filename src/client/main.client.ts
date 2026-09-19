@@ -1,13 +1,11 @@
-import { Workspace } from "@rbxts/services";
+import { Players } from "@rbxts/services";
+import { iniciarJogo } from "client/jogo";
 
-task.wait(2);
-
-// FindFirstChild + IsA em vez de indexação direta `Workspace.CasaTeste`:
-// indexar um filho inexistente gera erro em Luau
-// (ver guides/indexing-children + src/services.d.ts).
-const casa = Workspace.FindFirstChild("CasaTeste");
-if (casa !== undefined && casa.IsA("Model")) {
-	print(`[Client] CasaTeste encontrada com ${casa.GetChildren().size()} partes.`);
+const jogador = Players.LocalPlayer;
+if (jogador === undefined) {
+	warn("[PixelQuest] LocalPlayer indisponível.");
 } else {
-	print("[Client] CasaTeste ainda não existe (aguarde o servidor ou o Rojo).");
+	const playerGui = jogador.WaitForChild("PlayerGui") as PlayerGui;
+	iniciarJogo(playerGui);
+	print("[PixelQuest] Cliente iniciado: UI 2D pronta.");
 }
