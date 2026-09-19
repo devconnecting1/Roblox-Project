@@ -39,6 +39,13 @@ interface Flutuante {
 	vida: number;
 }
 
+interface ParticulaNivel {
+	frame: Frame;
+	ang: number;
+	atraso: number;
+	t: number;
+}
+
 interface TilePool {
 	frame: Frame;
 }
@@ -524,6 +531,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	let framePlayer: Frame | undefined = undefined;
 	let olhoPlayer: Frame | undefined = undefined;
+	let brilhoPlayer: Frame | undefined = undefined;
 	let placaVida: Frame | undefined = undefined;
 	let placaXp: Frame | undefined = undefined;
 	let placaNv: TextLabel | undefined = undefined;
@@ -536,6 +544,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let entCots: { [id: number]: EntFrame | undefined } = {};
 	let chavesCots: number[] = [];
 	const flutuantes: Flutuante[] = [];
+	// Efeito de level-up: anel que voa ao centro + brilho + flash + pisca
+	const partsNivel: ParticulaNivel[] = [];
+	let brilhoT = 0;
+	let flashT = 0;
+	let piscaT = 0;
+	let fxAtivo = false;
+	let fxFlash = false;
+	let flashBg: Frame | undefined = undefined;
 
 	// Input PC (só envia; servidor decide)
 	let teclaCima = false;
@@ -875,6 +891,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		flutuantes.push({ label: l, vida: 0.9 });
 	}
 
+	function iniciarEfeitoNivel(): void {
+		// Anel de quadradinhos que voa ao centro + brilho + flash + pisca + título
+		const N = 26;
+		for (let k = 0; k < N; k++) {
+			const f = novoQuadro(arena, `N${proxIdLocal}`, new UDim2(0, 8, 0, 8), new UDim2(0, -50, 0, -50), COR_XP, 0);
+			proxIdLocal++;
+			f.ZIndex = 19;
+			borda(f, COR_TEXTO, 1);
+			f.Visible = false;
+			partsNivel.push({ frame: f, ang: (k / N) * math.pi * 2, atraso: k * 0.018, t: 0 });
+		}
+		brilhoT = 1.4;
+		fxAtivo = true;
+		fxFlash = false;
+	}
+
 	Remotes.Client.Get("Foto").Connect((foto) => {
 		const antes = ultimaFoto;
 		ultimaFoto = foto;
@@ -895,8 +927,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
 			}
 			if (foto.nivel > antes.nivel) {
-				mostrarBanner(`NÍVEL ${foto.nivel}!`, 1.6);
+				mostrarBanner(`NÍVEL ${foto.nivel}!`, 2.4);
 				floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
+				iniciarEfeitoNivel();
 			}
 			for (const e of foto.inimigos) {
 				const hpAntes = inimigosVistos[e.id];
@@ -997,6 +1030,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		borda(p, COR_TEXTO, 2);
 		const olho = novoQuadro(p, "Olho", new UDim2(0, 6, 0, 6), new UDim2(0, 11, 0, 7), COR_TEXTO, 0);
 		olho.ZIndex = 11;
+		const brilho = novoQuadro(
+			p,
+			"Brilho",
+			new UDim2(1, 0, 1, 0),
+			new UDim2(0, 0, 0, 0),
+			Color3.fromRGB(255, 255, 255),
+			1,
+		);
+		brilho.ZIndex = 11;
 		const placa = novoQuadro(p, "Placa", new UDim2(0, 44, 0, 30), new UDim2(0, -12, 1, 4), COR_FUNDO, 1);
 		placa.ZIndex = 12;
 		const pvFundo = novoQuadro(
@@ -1036,6 +1078,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		pnome.ZIndex = 14;
 		framePlayer = p;
 		olhoPlayer = olho;
+		brilhoPlayer = brilho;
 		placaVida = pv;
 		placaXp = pxp;
 		placaNv = pnv;
@@ -1083,6 +1126,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			framePlayer.Destroy();
 			framePlayer = undefined;
 			olhoPlayer = undefined;
+			brilhoPlayer = undefined;
 			placaVida = undefined;
 			placaXp = undefined;
 			placaNv = undefined;
@@ -1094,6 +1138,18 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		camPronta = false;
 		plRX = 0;
 		plRY = 0;
+		for (const pt of partsNivel) {
+			pt.frame.Destroy();
+		}
+		partsNivel.clear();
+		brilhoT = 0;
+		flashT = 0;
+		piscaT = 0;
+		fxAtivo = false;
+		fxFlash = false;
+		if (flashBg !== undefined) {
+			flashBg.Visible = false;
+		}
 	}
 
 	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
@@ -1505,6 +1561,67 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				f.label.Position = new UDim2(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset - 40 * dt);
 				f.label.TextTransparency = 1 - f.vida / 0.9;
 			}
+		}
+
+		// Efeito de level-up: anel voa ao centro, jogador brilha, flash + pisca
+		if (fxAtivo) {
+			const cx0 = tX(px) - 4;
+			const cy0 = tY(py) - 4;
+			for (let i = partsNivel.size() - 1; i >= 0; i--) {
+				const pt = partsNivel[i];
+				if (pt.atraso > 0) {
+					pt.atraso -= dt;
+				} else {
+					pt.t += dt / 0.55;
+					if (pt.t >= 1) {
+						pt.frame.Destroy();
+						partsNivel[i] = partsNivel[partsNivel.size() - 1];
+						partsNivel.pop();
+					} else {
+						const e = 1 - (1 - pt.t) * (1 - pt.t); // ease-out: acelera no centro
+						const r = 78 * (1 - e);
+						pt.frame.Position = new UDim2(0, cx0 + math.cos(pt.ang) * r, 0, cy0 + math.sin(pt.ang) * r);
+						pt.frame.Visible = true;
+					}
+				}
+			}
+			if (partsNivel.size() === 0 && !fxFlash) {
+				fxFlash = true;
+				flashT = 0.28;
+				piscaT = 0.36;
+				if (flashBg === undefined) {
+					const fb = novoQuadro(
+						telaJogo,
+						"Flash",
+						new UDim2(1, 0, 1, 0),
+						new UDim2(0, 0, 0, 0),
+						Color3.fromRGB(255, 255, 255),
+						0,
+					);
+					fb.ZIndex = 68;
+					fb.Visible = false;
+					flashBg = fb;
+				}
+				flashBg.Visible = true;
+			}
+		}
+		if (brilhoT > 0) {
+			brilhoT -= dt;
+			if (brilhoPlayer !== undefined) {
+				brilhoPlayer.BackgroundTransparency = brilhoT > 0 ? 0.35 + 0.3 * math.sin(tempo * 18) : 1;
+			}
+		}
+		if (flashT > 0 && flashBg !== undefined) {
+			flashT -= dt;
+			flashBg.BackgroundTransparency = flashT > 0 ? 1 - (flashT / 0.28) * 0.85 : 1;
+			if (flashT <= 0) {
+				flashBg.Visible = false;
+				fxAtivo = false;
+			}
+		}
+		if (piscaT > 0 && framePlayer !== undefined) {
+			piscaT -= dt;
+			framePlayer.Visible = piscaT > 0 ? math.floor(piscaT / 0.06) % 2 === 0 : true;
 		}
 
 		if (bannerT > 0) {

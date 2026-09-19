@@ -71,8 +71,8 @@ export const CLASSES: ClasseInfo[] = [
 		nome: "Aventureiro",
 		descricao: "Equilibrado e corajoso. Pronto para a masmorra.",
 		hpMax: 42,
-		dano: 9,
-		cadencia: 0.3,
+		dano: 5, // metralhadora: balas rápidas e fracas (DPS ~45)
+		cadencia: 0.11,
 		velTiro: 460,
 		velocidade: 185,
 		cor: Color3.fromRGB(231, 76, 60),
@@ -199,7 +199,7 @@ export interface InimigoInfo {
 export const INIMIGOS: InimigoInfo[] = [
 	{
 		nome: "Zumbi de Alga",
-		hp: 18,
+		hp: 26,
 		danoContato: 6,
 		velocidade: 70,
 		xp: 8,
@@ -214,7 +214,7 @@ export const INIMIGOS: InimigoInfo[] = [
 	},
 	{
 		nome: "Papagaio Tropical",
-		hp: 12,
+		hp: 18,
 		danoContato: 4,
 		velocidade: 122,
 		xp: 6,
@@ -229,7 +229,7 @@ export const INIMIGOS: InimigoInfo[] = [
 	},
 	{
 		nome: "Marinheiro",
-		hp: 32,
+		hp: 48,
 		danoContato: 8,
 		velocidade: 62,
 		xp: 12,
@@ -238,15 +238,15 @@ export const INIMIGOS: InimigoInfo[] = [
 		cor: Color3.fromRGB(52, 152, 219),
 		tamanho: 24,
 		atira: true,
-		cadenciaTiro: 2.4,
-		velBala: 150,
+		cadenciaTiro: 1.1,
+		velBala: 170,
 		danoBala: 5,
 	},
 ];
 
 export const BOSS: InimigoInfo = {
 	nome: "Sereia da Praia",
-	hp: 230,
+	hp: 340,
 	danoContato: 12,
 	velocidade: 55,
 	xp: 100,
@@ -255,8 +255,8 @@ export const BOSS: InimigoInfo = {
 	cor: Color3.fromRGB(155, 89, 182),
 	tamanho: 40,
 	atira: true,
-	cadenciaTiro: 1.4,
-	velBala: 130,
+	cadenciaTiro: 0.8,
+	velBala: 145,
 	danoBala: 7,
 };
 

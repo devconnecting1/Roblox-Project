@@ -703,7 +703,7 @@ function alertarAliados(px: number, py: number, excetoId: number): void {
 }
 
 // ---------- Update ----------
-const MAX_BALAS = 160;
+const MAX_BALAS = 260; // teto maior p/ tiroteio dos dois lados
 /** Push com teto (anti-spam/lag: descarta excedente). */
 function empurrarBala(b: Omit<BalaS, "id">): void {
 	if (mundo.balas.size() < MAX_BALAS) {
@@ -952,7 +952,7 @@ export function atualizar(dt: number): void {
 					tam: 9,
 				});
 			}
-			e.rajadaT = 2.6;
+			e.rajadaT = 1.9;
 		}
 	}
 
