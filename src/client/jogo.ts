@@ -2,12 +2,12 @@
  * Pixel Quest 2D — CLIENTE (renderer + input, sem simulação).
  *
  * Anti-cheat: este arquivo NÃO decide nada de jogo. Ele desenha o mundo
- * (tiles, entidades, fog, minimapa, HUD) a partir dos snapshots do servidor
- * (`Foto` 15Hz) e envia só inputs validados (`Entrada`, dash, pausa,
+ * (tiles, entidades, fog, HUD) a partir dos snapshots do servidor
+ * (`Foto` 20Hz) e envia só inputs validados (`Entrada`, dash, pausa,
  * equipar/remover, escolher mapa). Dano, posição, loot e portas vivem no
  * servidor — trapaça de cliente não tem efeito.
  *
- * PC only, tela cheia, câmera dinâmica, Fog of War, minimapa quadrado.
+ * PC only, tela cheia, câmera dinâmica livre, Fog of War (sem minimapa).
  */
 import { Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
 import {
@@ -15,8 +15,6 @@ import {
 	COR_TILE,
 	ITEM_POR_ID,
 	MAPAS,
-	MUNDO_A,
-	MUNDO_L,
 	MUNDO_TX,
 	MUNDO_TY,
 	NOME_SLOT,
@@ -58,7 +56,6 @@ const COR_DESCONHECIDO = Color3.fromRGB(8, 10, 14);
 const TOPO_Y = 36; // abaixo da topbar nativa do Roblox
 const MAX_BALAS_POOL = 80;
 const MAX_COTS_POOL = 50;
-const MINI = 130; // minimapa quadrado
 
 const COR_ESCURA: { [chave: string]: Color3 } = {};
 for (const ch of ["W", "~", ".", ",", "G", "T", "*", "R", "D"]) {
@@ -268,34 +265,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		linhasQuest[i].TextWrapped = true;
 	}
 
-	// Minimapa QUADRADO: mapa explorado + pontos de quem está visível
-	const minimapa = novoQuadro(telaJogo, "Minimapa", new UDim2(0, MINI, 0, MINI), new UDim2(1, -(MINI + 10), 0, TOPO_Y + 50), COR_DESCONHECIDO, 0);
-	minimapa.ZIndex = 50;
-	borda(minimapa, COR_TEXTO, 2);
-	const celulasMini: Frame[] = [];
-	const CEL = 25; // 25x25 células (2x2 tiles cada)
-	for (let i = 0; i < CEL * CEL; i++) {
-		const f = novoQuadro(
-			minimapa,
-			`C${i}`,
-			new UDim2(0, MINI / CEL, 0, MINI / CEL),
-			new UDim2(0, (i % CEL) * (MINI / CEL), 0, math.floor(i / CEL) * (MINI / CEL)),
-			COR_DESCONHECIDO,
-			0,
-		);
-		f.ZIndex = 1;
-		celulasMini.push(f);
-	}
-	const pontoPlayer = novoQuadro(minimapa, "Voce", new UDim2(0, 5, 0, 5), new UDim2(0, 0, 0, 0), COR_TEXTO, 0);
-	pontoPlayer.ZIndex = 3;
-	const pontosMini: Frame[] = [];
-	for (let i = 0; i < 30; i++) {
-		const p = novoQuadro(minimapa, `E${i}`, new UDim2(0, 4, 0, 4), new UDim2(0, 0, 0, 0), COR_PERIGO, 0);
-		p.Visible = false;
-		p.ZIndex = 2;
-		pontosMini.push(p);
-	}
-
 	const banner = novoTexto(telaJogo, "Banner", "", 34, COR_DESTAQUE, new UDim2(1, 0, 0, 50), new UDim2(0, 0, 0.35, 0));
 	banner.ZIndex = 60;
 	banner.Visible = false;
@@ -369,6 +338,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	const tiles: TilePool[] = [];
 	let camadaTiles: Frame | undefined = undefined;
+	let tileEstado: number[] = []; // 0=desconhecido 1=escuro 2=visível (recolor só no que muda)
 	let tilesCols = 0;
 	let tilesRows = 0;
 	let camTileX = -1;
@@ -459,6 +429,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			t.frame.Destroy();
 		}
 		tiles.clear();
+		tileEstado = [];
 		if (camadaTiles !== undefined) {
 			camadaTiles.Destroy();
 		}
@@ -484,6 +455,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			d.ZIndex = 2;
 			d.Visible = false;
 			tiles.push({ frame: f, detalhe: d });
+			tileEstado.push(-1);
 		}
 		camTileX = -1;
 		camTileY = -1;
@@ -545,6 +517,12 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const cy = (ty + 0.5) * TILE - py;
 			const vis = cx * cx + cy * cy < VISAO * VISAO;
 			const exp = tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY && explorado[ty * MUNDO_TX + tx];
+			// Otimização: só toca no tile cujo estado de névoa mudou
+			const est = vis ? 2 : exp ? 1 : 0;
+			if (est === tileEstado[i]) {
+				continue;
+			}
+			tileEstado[i] = est;
 			if (vis) {
 				t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
 			} else if (exp) {
@@ -736,7 +714,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			for (let i = 0; i < MUNDO_TX * MUNDO_TY; i++) {
 				explorado.push(false);
 			}
-			construirMiniFundo();
 			camTileX = -1;
 			camTileY = -1;
 			nevoaTileX = -999;
@@ -1008,66 +985,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	});
 
-	// ===== Minimapa quadrado (mapa explorado + pontos visíveis) =====
-	function construirMiniFundo(): void {
-		for (let i = 0; i < celulasMini.size(); i++) {
-			const cx = i % CEL;
-			const cy = math.floor(i / CEL);
-			const tx = cx * 2;
-			const ty = cy * 2;
-			let ch = "R";
-			if (tx < MUNDO_TX && ty < MUNDO_TY && grade.size() > ty) {
-				ch = grade[ty].sub(tx + 1, tx + 1);
-			}
-			const f = celulasMini[i];
-			f.BackgroundColor3 = COR_ESCURA[ch] ?? COR_DESCONHECIDO;
-			f.Visible = false;
-		}
-	}
-
-	function atualizarMinimapa(foto: Foto): void {
-		// Revela células exploradas
-		for (let i = 0; i < celulasMini.size(); i++) {
-			if (celulasMini[i].Visible) {
-				continue;
-			}
-			const cx = i % CEL;
-			const cy = math.floor(i / CEL);
-			let ver = false;
-			for (let a = 0; a < 4 && !ver; a++) {
-				const tx = cx * 2 + (a % 2);
-				const ty = cy * 2 + math.floor(a / 2);
-				if (tx < MUNDO_TX && ty < MUNDO_TY && explorado[ty * MUNDO_TX + tx]) {
-					ver = true;
-				}
-			}
-			if (ver) {
-				celulasMini[i].Visible = true;
-			}
-		}
-		pontoPlayer.Position = new UDim2(0, (foto.px / MUNDO_L) * MINI - 2, 0, (foto.py / MUNDO_A) * MINI - 2);
-		let di = 0;
-		const marcar = (x: number, y: number, cor: Color3): void => {
-			if (di >= pontosMini.size()) {
-				return;
-			}
-			const dot = pontosMini[di];
-			di++;
-			dot.Visible = true;
-			dot.BackgroundColor3 = cor;
-			dot.Position = new UDim2(0, (x / MUNDO_L) * MINI - 2, 0, (y / MUNDO_A) * MINI - 2);
-		};
-		for (const j of foto.jogadores) {
-			marcar(j.x, j.y, Color3.fromRGB(90, 220, 120));
-		}
-		for (const e of foto.inimigos) {
-			marcar(e.x, e.y, e.boss ? COR_BALA_INIMIGA : COR_PERIGO);
-		}
-		for (let i = di; i < pontosMini.size(); i++) {
-			pontosMini[i].Visible = false;
-		}
-	}
-
 	// ===== Loop de render =====
 	function suavizar(ent: EntFrame, x: number, y: number, dt: number): void {
 		if (ent.rx === 0 && ent.ry === 0) {
@@ -1122,9 +1039,10 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (foto === undefined) {
 			return;
 		}
-		// Câmera segue o jogador (mundo fixo)
-		camX = math.clamp(foto.px - vistaL / 2, 0, MUNDO_L - vistaL);
-		camY = math.clamp(foto.py - vistaA / 2, 0, MUNDO_A - vistaA);
+		// Câmera segue o jogador SEM travas: nas bordas aparece o vazio Rocha,
+		// o que comunica o limite do mundo sem "grudar" a visão
+		camX = foto.px - vistaL / 2;
+		camY = foto.py - vistaA / 2;
 		marcarExplorado();
 		desenharTiles();
 
@@ -1248,7 +1166,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			barraBossFundo.Visible = false;
 			txtBoss.Visible = false;
 		}
-		atualizarMinimapa(foto);
 	});
 
 	print("[PixelQuest] Cliente renderer pronto (tudo simulado no servidor).");

@@ -10,11 +10,11 @@
 // ---------- Mundo (quadrado, procedural no servidor) ----------
 // Tiles: `W` (sólido) | `~` água | `.`/`,` chão | `G` pedra | `T` tocha
 //        `*` musgo | `R` parede (sólida) | `D` porta trancada (sólida)
-export const MUNDO_L = 2400;
-export const MUNDO_A = 2400;
+export const MUNDO_L = 2880;
+export const MUNDO_A = 2880;
 export const TILE = 48;
-export const MUNDO_TX = 50; // MUNDO_L / TILE
-export const MUNDO_TY = 50; // MUNDO_A / TILE
+export const MUNDO_TX = 60; // MUNDO_L / TILE
+export const MUNDO_TY = 60; // MUNDO_A / TILE
 
 /** Raio de visão do Fog of War (px). */
 export const VISAO = 340;
@@ -212,8 +212,8 @@ export const BOSS: InimigoInfo = {
 	danoBala: 7,
 };
 
-/** Inimigos por área (0–3; área 4 = boss). */
-export const INIMIGOS_POR_AREA: number[] = [6, 7, 8, 9];
+/** Inimigos por área (0–3; área 4 = boss). Nascem ao liberar a área. */
+export const INIMIGOS_POR_AREA: number[] = [7, 8, 9, 10];
 
 /** Tipos desbloqueados por área (índices em INIMIGOS). */
 export function tiposPorArea(area: number): number[] {

@@ -254,9 +254,8 @@ function novaMasmorra(): void {
 	mundo.bossMorto = false;
 	mundo.tempo = 0;
 	mundo.ativo = true;
-	for (let a = 0; a < 4; a++) {
-		spawnPack(a);
-	}
+	// Só a área 0 nasce com a masmorra; as demais surgem ao liberar a anterior
+	spawnPack(0);
 	print(`[PixelQuest] Masmorra gerada: ${mundo.inimigos.size()} inimigos, ${mundo.portas.size()} portas.`);
 }
 
@@ -576,8 +575,8 @@ function matarInimigo(idx: number, assassino: JogadorS): void {
 				fimRun(outro, true);
 			}
 		}
-	} else {
-		// Área limpa? Abre as portas da fronteira (desbloqueio por área)
+	} else if (e.area < 4) {
+		// Área limpa? Abre as portas E povoa a próxima (áreas trancadas não têm inimigos)
 		if (!mundo.areasLimpas[e.area] && mundo.vivosPorArea[e.area] <= 0) {
 			mundo.areasLimpas[e.area] = true;
 			for (const p of mundo.portas) {
@@ -586,9 +585,10 @@ function matarInimigo(idx: number, assassino: JogadorS): void {
 					difundir({ tipo: "porta", tx: p.tx, ty: p.ty });
 				}
 			}
+			spawnPack(e.area + 1);
 			assassino.moedas += 5 + e.area * 2;
-			difundir({ tipo: "banner", texto: `ÁREA ${e.area + 1} LIBERADA!`, duracao: 2 });
-			print(`[PixelQuest] Área ${e.area} limpa, portas abertas.`);
+			difundir({ tipo: "banner", texto: `ÁREA ${e.area + 1} LIMPA! Inimigos à frente...`, duracao: 2.5 });
+			print(`[PixelQuest] Área ${e.area} limpa: portas abertas + área ${e.area + 1} povoada.`);
 		}
 	}
 }
@@ -610,8 +610,20 @@ function jogadorMaisProximo(x: number, y: number): JogadorS | undefined {
 }
 
 // ---------- Update ----------
+const MAX_BALAS = 160;
+
+/** Push com teto (anti-spam/lag: descarta excedente). */
+function empurrarBala(b: BalaS): void {
+	if (mundo.balas.size() < MAX_BALAS) {
+		mundo.balas.push(b);
+	}
+}
+
 export function atualizar(dt: number): void {
-	if (!mundo.ativo || mundo.pausado) {
+	if (!mundo.ativo || mundo.jogadores.size() === 0) {
+		return; // sem jogadores, sem simulação (economiza CPU)
+	}
+	if (mundo.pausado) {
 		return;
 	}
 	if (dt > 0.1) {
@@ -673,7 +685,7 @@ export function atualizar(dt: number): void {
 				const dy = melhor.y - js.y;
 				const d = math.sqrt(dx * dx + dy * dy);
 				if (d > 1) {
-					mundo.balas.push({ x: js.x, y: js.y, vx: (dx / d) * c.velTiro, vy: (dy / d) * c.velTiro, vida: 1.6, dano: danoTotal(js), amiga: true, tam: c.tamTiro });
+					empurrarBala({ x: js.x, y: js.y, vx: (dx / d) * c.velTiro, vy: (dy / d) * c.velTiro, vida: 1.6, dano: danoTotal(js), amiga: true, tam: c.tamTiro });
 					js.fx = dx / d;
 					js.fy = dy / d;
 				}
@@ -719,10 +731,10 @@ export function atualizar(dt: number): void {
 			if (e.boss) {
 				for (let k = -1; k <= 1; k++) {
 					const base = math.atan2(dy, dx) + k * 0.22;
-					mundo.balas.push({ x: e.x, y: e.y, vx: math.cos(base) * e.info.velBala, vy: math.sin(base) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+					empurrarBala({ x: e.x, y: e.y, vx: math.cos(base) * e.info.velBala, vy: math.sin(base) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
 				}
 			} else {
-				mundo.balas.push({ x: e.x, y: e.y, vx: (dx / d) * e.info.velBala, vy: (dy / d) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+				empurrarBala({ x: e.x, y: e.y, vx: (dx / d) * e.info.velBala, vy: (dy / d) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
 			}
 			e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 		}
@@ -732,7 +744,7 @@ export function atualizar(dt: number): void {
 		if (e.boss && e.rajadaT <= 0) {
 			for (let k = 0; k < 12; k++) {
 				const a = (k / 12) * math.pi * 2 + mundo.tempo;
-				mundo.balas.push({ x: e.x, y: e.y, vx: math.cos(a) * 110, vy: math.sin(a) * 110, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+				empurrarBala({ x: e.x, y: e.y, vx: math.cos(a) * 110, vy: math.sin(a) * 110, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
 			}
 			e.rajadaT = 2.6;
 		}
@@ -855,9 +867,9 @@ export function atualizar(dt: number): void {
 		}
 	}
 
-	// Snapshots (15 Hz) filtrados pelo Fog of War
+	// Snapshots 20 Hz filtrados pelo Fog of War (fluidez sem flood)
 	mundo.snapT += dt;
-	if (mundo.snapT >= 1 / 15) {
+	if (mundo.snapT >= 1 / 20) {
 		mundo.snapT = 0;
 		for (const [, js] of mundo.jogadores) {
 			if (!js.morto) {

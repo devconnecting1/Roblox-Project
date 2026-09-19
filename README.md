@@ -37,15 +37,16 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 
 ## Arquitetura anti-cheat (servidor autoritativo)
 
-- **Servidor** (`src/server/simulacao.ts` + `mundo.ts`): mundo procedural 50×50 em 5 áreas, movimento com colisão, dano, inimigos, balas, loot, quests, portas e XP. Inputs do cliente são validados (`@rbxts/t`: faixa + posse) e normalizados (sem speed hack).
-- **Rede** (`shared/pixelquest/Rede.ts`, `@rbxts/net`): cliente→servidor (`Entrada`, `Pausa`, `Equipar`, `Remover`, `EscolherMapa`); servidor→cliente (`Foto` 15Hz filtrada pelo Fog of War, `Evento` p/ mapa/portas/banners/fim).
-- **Cliente** (`src/client/jogo.ts`): só renderiza (câmera, fog, minimapa, HUD) e envia inputs. Nada de jogo é decidido aqui — trapaça de cliente não tem efeito.
+- **Servidor** (`src/server/simulacao.ts` + `mundo.ts`): mundo procedural 60×60 em 5 áreas, movimento com colisão, dano, inimigos, balas, loot, quests, portas e XP. Inputs do cliente são validados (`@rbxts/t`: faixa + posse) e normalizados (sem speed hack).
+- **Rede** (`shared/pixelquest/Rede.ts`, `@rbxts/net`): cliente→servidor (`Entrada`, `Pausa`, `Equipar`, `Remover`, `EscolherMapa`); servidor→cliente (`Foto` 20Hz filtrada pelo Fog of War, `Evento` p/ mapa/portas/banners/fim).
+- **Cliente** (`src/client/jogo.ts`): só renderiza (câmera livre, fog, HUD) e envia inputs. Nada de jogo é decidido aqui — trapaça de cliente não tem efeito. Sem minimapa.
 
 ## O jogo
 
-- **Mundo quadrado 2400×2400 procedural:** 5 áreas com salas + corredores; portas ciano abrem só ao limpar a área; área 5 tem o boss (spawna ao entrar)
-- **Fog of War:** só o visível é enviado/renderizado; explorado fica escurecido, inexplorado preto; minimapa quadrado revela o mapa + pontos de quem está visível
-- **Sem ondas:** inimigos nascem nos caminhos de cada área; progressão = limpar → avançar
+- **Mundo quadrado 2880×2880 procedural:** 5 áreas longas com salas + corredores; portas ciano abrem só ao limpar a área (áreas trancadas nascem vazias e só são povoadas ao liberar a anterior); área 5 tem o boss (spawna ao entrar)
+- **Fog of War:** só o visível é enviado/renderizado; explorado fica escurecido, inexplorado preto (sem minimapa)
+- **Otimizado:** snapshots 20Hz, recolor de tiles só no que muda de estado, sem simulação sem jogadores, teto de balas, câmera sem travas (borda mostra Rocha)
+- **Sem ondas:** inimigos nascem nos caminhos de cada área liberada; progressão = limpar → avançar
 - **Seletor de mapas (5 slots):** Mapa 1 liberado para todos; Mapas 2–5 mostram `Nv 10/20/30/40 • EM BREVE` (desbloqueio pelo Nível da conta nos leaderstats)
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
 - **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado
@@ -56,7 +57,7 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **ZIndex à prova de regressão:** `ZIndexBehavior=Sibling` + camadas (mapa 1–20, HUD 50+, painel 65, telas 70) — HUD nunca mais fica atrás de tile
 - **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (atira!) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell)
 - **Controles (PC):** WASD/setas movem em todas as direções, tiro automático no inimigo mais próximo, SHIFT/L = dash (invencibilidade breve), P pausa, ≡ OPÇÕES = tarefas/mochila/equipamentos (pausa o jogo)
-- **HUD do jogador sob o personagem:** plaquinha pequena com barra de vida + barra de XP + nível (topo só tem moedas, onda, quests e minimapa)
+- **HUD do jogador sob o personagem:** plaquinha pequena com barra de vida + barra de XP + nível (topo só tem moedas, onda e quests)
 - **Visibilidade vs. botões nativos:** HUD do topo começa em x=175/y=36 (longe do ☰/chat e do placar), abaixo da topbar nativa
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
 - **Progressão:** XP → nível (+4 HP máx, cura total); moedas com imã; corações curam; morte/vitória salva via Net nos leaderstats (Moedas, Nivel, Valor)

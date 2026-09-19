@@ -1,10 +1,11 @@
 /**
- * Mundo procedural (SERVIDOR) — masmorra 50×50 em 5 áreas verticais.
+ * Mundo procedural (SERVIDOR) — masmorra 60×60 em 5 áreas verticais.
  *
- * Área `k` ocupa as colunas [k*10, k*10+10). Cada área tem salas próprias;
+ * Área `k` ocupa as colunas [k*12, k*12+12). Cada área tem salas próprias;
  * áreas vizinhas ligam-se por 1 corredor com 2 portas ("D", sólidas).
- * A porta da fronteira k→k+1 abre quando TODOS os inimigos da área k morrem.
- * A área 4 é a do boss. Grade refeita a cada run (roguelike).
+ * A porta da fronteira k→k+1 abre quando TODOS os inimigos da área k morrem
+ * (e a próxima área só então é povoada). A área 4 é a do boss.
+ * Grade refeita a cada run (roguelike).
  */
 import { MUNDO_A, MUNDO_L, MUNDO_TX, MUNDO_TY, TILE, eSolido } from "shared/pixelquest/Dados";
 
@@ -27,7 +28,7 @@ let grade: string[][] = [];
 let portas: Porta[] = [];
 let nasc: [number, number] = [MUNDO_L / 2, MUNDO_A / 2];
 
-const LARG_BANDA = 10; // tiles por área
+const LARG_BANDA = 12; // tiles por área (5 bandas em 60 colunas)
 
 function porChao(tx: number, ty: number): void {
 	if (tx < 1 || ty < 1 || tx >= MUNDO_TX - 1 || ty >= MUNDO_TY - 1) {
@@ -78,7 +79,7 @@ export function gerarMundo(): { portas: Porta[]; nasc: [number, number] } {
 	const bandas: Sala[][] = [[], [], [], [], []];
 	for (let b = 0; b < 5; b++) {
 		const x0 = b * LARG_BANDA;
-		for (let t = 0; t < 40 && bandas[b].size() < 5; t++) {
+		for (let t = 0; t < 40 && bandas[b].size() < 4; t++) {
 			const w = 4 + math.floor(math.random() * 4);
 			const h = 4 + math.floor(math.random() * 3);
 			const x = x0 + 1 + math.floor(math.random() * (LARG_BANDA - w - 1));
