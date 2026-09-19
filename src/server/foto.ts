@@ -114,6 +114,7 @@ function enviarFoto(js: JogadorS): void {
 		eqAcess: js.eqAcess !== undefined ? js.eqAcess.id : "",
 		pausado: js.pausado,
 		areasAbertas: areas,
+		lobby: mundo.modo === "lobby",
 	};
 	Remotes.Server.Get("Foto").SendToPlayer(js.player, foto);
 }

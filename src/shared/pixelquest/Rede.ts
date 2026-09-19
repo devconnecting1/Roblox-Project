@@ -18,6 +18,9 @@ export const Remotes = Net.Definitions.Create({
 	Equipar: Net.Definitions.ClientToServerEvent<[id: string]>(),
 	Remover: Net.Definitions.ClientToServerEvent<[slot: string]>(),
 	EscolherMapa: Net.Definitions.ClientToServerEvent<[mapa: number]>(),
+	Entrar: Net.Definitions.ClientToServerEvent<[]>(),
+	Lobby: Net.Definitions.ClientToServerEvent<[]>(),
+	Placar: Net.Definitions.ClientToServerEvent<[]>(),
 	// Servidor → cliente
 	Foto: Net.Definitions.ServerToClientEvent<[foto: Foto]>(),
 	Evento: Net.Definitions.ServerToClientEvent<[ev: EventoPayload]>(),

@@ -3,7 +3,8 @@ import { eEntrada, eIdTexto, eMapaIdx, Remotes } from "shared/pixelquest/Rede";
 import { alternarPausa, aplicarEntrada, equiparItem, removerJogador, removerSlot } from "./jogadores";
 import { mundo, nivelConta } from "./estado";
 import { carregarDados, salvarDados } from "./save";
-import { atualizar, escolherMapa } from "./simulacao";
+import { atualizar, escolherMapa, entrarJogo, voltarLobby } from "./simulacao";
+import { placar } from "./save";
 
 // Jogo 100% interface 2D: o avatar 3D nunca nasce.
 Players.CharacterAutoLoads = false;
@@ -59,6 +60,19 @@ Remotes.Server.Get("EscolherMapa").Connect((player, mapa) => {
 		return;
 	}
 	escolherMapa(player, mapa);
+});
+
+Remotes.Server.Get("Entrar").Connect((player) => {
+	entrarJogo(player);
+});
+
+Remotes.Server.Get("Lobby").Connect((player) => {
+	voltarLobby(player);
+});
+
+Remotes.Server.Get("Placar").Connect((player) => {
+	const dados = placar();
+	Remotes.Server.Get("Evento").SendToPlayer(player, { tipo: "placar", dados: dados });
 });
 
 // Loop autoritativo

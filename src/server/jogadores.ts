@@ -278,6 +278,7 @@ export function fimRun(js: JogadorS, venceu: boolean): void {
 	const m = statInt(js.player, "Moedas");
 	const n = statInt(js.player, "Nivel");
 	const v = statInt(js.player, "Valor");
+	const a = statInt(js.player, "Abates");
 	if (m !== undefined) {
 		m.Value += math.floor(js.moedas);
 	}
@@ -286,6 +287,9 @@ export function fimRun(js: JogadorS, venceu: boolean): void {
 	}
 	if (v !== undefined) {
 		v.Value += math.floor(valor);
+	}
+	if (a !== undefined) {
+		a.Value += js.abates;
 	}
 	enviar(js.player, {
 		tipo: "fim",

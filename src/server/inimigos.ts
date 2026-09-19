@@ -134,9 +134,16 @@ export function matarInimigo(idx: number, assassino: JogadorS): void {
 }
 
 export function atualizarInimigos(dt: number): void {
-	// Boss entra quando alguém pisa na área 4
+	// Boss entra quando alguém pisa na área 4 (só na dungeon; lobby não tem boss)
 	for (const [, js] of mundo.jogadores) {
-		if (!js.morto && !js.pausado && !mundo.bossVivo && !mundo.bossMorto && areaDe(js.x) === 4) {
+		if (
+			!js.morto &&
+			!js.pausado &&
+			mundo.modo === "dungeon" &&
+			!mundo.bossVivo &&
+			!mundo.bossMorto &&
+			areaDe(js.x) === 4
+		) {
 			spawnBoss();
 		}
 	}

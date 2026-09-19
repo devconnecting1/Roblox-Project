@@ -103,6 +103,7 @@ export interface JogadorS {
 
 interface Mundo {
 	ativo: boolean;
+	modo: "lobby" | "dungeon"; // um mundo por servidor (party fica junta)
 	portas: Porta[];
 	nasc: [number, number];
 	areasLimpas: boolean[];
@@ -121,6 +122,7 @@ interface Mundo {
 
 export const mundo: Mundo = {
 	ativo: false,
+	modo: "lobby",
 	portas: [],
 	nasc: [MUNDO_L / 2, MUNDO_A / 2],
 	areasLimpas: [false, false, false, false, false],
@@ -144,7 +146,7 @@ export function dist2(x1: number, y1: number, x2: number, y2: number): number {
 }
 
 // ---------- Leaderstats ----------
-export function garantirLeaderstats(player: Player, moedas = 0, nivel = 1, valor = 0): void {
+export function garantirLeaderstats(player: Player, moedas = 0, nivel = 1, valor = 0, abates = 0): void {
 	let stats = player.FindFirstChild("leaderstats");
 	if (stats === undefined || !stats.IsA("Folder")) {
 		const pasta = new Instance("Folder");
@@ -153,12 +155,12 @@ export function garantirLeaderstats(player: Player, moedas = 0, nivel = 1, valor
 		stats = pasta;
 	}
 	const pasta = stats as Folder;
-	for (const nome of ["Moedas", "Nivel", "Valor"]) {
+	for (const nome of ["Moedas", "Nivel", "Valor", "Abates"]) {
 		const achou = pasta.FindFirstChild(nome);
 		if (achou === undefined || !achou.IsA("IntValue")) {
 			const v = new Instance("IntValue");
 			v.Name = nome;
-			v.Value = nome === "Nivel" ? nivel : nome === "Moedas" ? moedas : valor;
+			v.Value = nome === "Nivel" ? nivel : nome === "Moedas" ? moedas : nome === "Abates" ? abates : valor;
 			v.Parent = pasta;
 		}
 	}

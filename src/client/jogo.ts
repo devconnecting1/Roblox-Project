@@ -15,6 +15,7 @@ import {
 	COR_TILE,
 	eSolido,
 	ITEM_POR_ID,
+	LOBBY_ZONAS,
 	MAPAS,
 	MUNDO_TX,
 	MUNDO_TY,
@@ -24,6 +25,7 @@ import {
 	TITULOS,
 	VISAO,
 	Foto,
+	PlacarDados,
 } from "shared/pixelquest/Dados";
 import { Remotes } from "shared/pixelquest/Rede";
 import {
@@ -378,19 +380,28 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaFim,
 		"DeNovo",
 		"JOGAR DE NOVO",
-		new UDim2(0, 260, 0, 60),
-		new UDim2(0.5, -270, 0, 390),
+		new UDim2(0, 170, 0, 60),
+		new UDim2(0.5, -265, 0, 390),
 		COR_PAINEL,
-		20,
+		18,
+	);
+	const btnLobby = novoBotao(
+		telaFim,
+		"Lobby",
+		"LOBBY",
+		new UDim2(0, 170, 0, 60),
+		new UDim2(0.5, -85, 0, 390),
+		COR_PAINEL,
+		18,
 	);
 	const btnMenu = novoBotao(
 		telaFim,
 		"Menu",
 		"MENU",
-		new UDim2(0, 260, 0, 60),
-		new UDim2(0.5, 10, 0, 390),
+		new UDim2(0, 170, 0, 60),
+		new UDim2(0.5, 95, 0, 390),
 		COR_PAINEL,
-		20,
+		18,
 	);
 
 	// ===== Estado de render (espelho do servidor) =====
@@ -412,6 +423,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let ultimoFotoT = -99;
 	let semente = 0;
 	let nivelPendente = 0;
+	let zonaLobby: "mapas" | "encant" | "rank" | undefined = undefined;
+	let placarAberto = false;
+	let telaPlacar: Frame | undefined = undefined;
+	let colPlacarNv: TextLabel | undefined = undefined;
+	let colPlacarKill: TextLabel | undefined = undefined;
+	let colPlacarMoeda: TextLabel | undefined = undefined;
+	let zonaFrames: { rect: Frame; rotulo: TextLabel; wx: number; wy: number; wh: number }[] = [];
 	let hudMoedas = -1;
 	let hudOnda = "";
 	let hudPausa = false;
@@ -787,7 +805,35 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		garantirPoolTiles();
 		mostrarBanner("CARREGANDO MASMORRA...", 9999);
 		Remotes.Client.Get("EscolherMapa").SendToServer(idx);
+		zonaLobby = undefined;
+		if (placarAberto) {
+			fecharPlacar();
+		}
 		print(`[PixelQuest] Escolheu mapa ${idx}.`);
+	}
+
+	function entrarNoLobby(): void {
+		telaMapas.Visible = false;
+		telaMenu.Visible = false;
+		telaFim.Visible = false;
+		telaJogo.Visible = true;
+		estado = "jogo";
+		primeiraFoto = false;
+		envDx = 0;
+		envDy = 0;
+		envAx = 0;
+		envAy = 0;
+		envFogo = false;
+		envAuto = false;
+		envT = 0;
+		fogoMouse = false;
+		autoTiro = false;
+		enviarEntrada(0, 0, 0, 0, false, false, false);
+		limparEntidades();
+		garantirPoolTiles();
+		mostrarBanner("BEM-VINDO AO LOBBY!", 2.5);
+		Remotes.Client.Get("Entrar").SendToServer();
+		print("[PixelQuest] Entrou no lobby.");
 	}
 
 	function mostrarFim(
@@ -811,7 +857,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaFim.Visible = true;
 	}
 
-	btnJogar.Activated.Connect(() => abrirSeletor());
+	btnJogar.Activated.Connect(() => entrarNoLobby());
 	for (let i = 0; i < slotsMapa.size(); i++) {
 		const idx = i;
 		slotsMapa[idx].Activated.Connect(() => {
@@ -827,10 +873,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 	btnVoltarMapas.Activated.Connect(() => {
 		telaMapas.Visible = false;
-		telaMenu.Visible = true;
-		estado = "menu";
+		telaJogo.Visible = true;
+		estado = "jogo";
 	});
 	btnDeNovo.Activated.Connect(() => entrarNoMapa(mapaIdx));
+	btnLobby.Activated.Connect(() => {
+		Remotes.Client.Get("Lobby").SendToServer();
+	});
 	btnMenu.Activated.Connect(() => {
 		limparEntidades();
 		estado = "menu";
@@ -904,12 +953,19 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			nevoaTileY = -999;
 			expTX = -999;
 			expTY = -999;
+			if (ev.lobby) {
+				construirZonas();
+			} else {
+				limparZonas();
+			}
 		} else if (ev.tipo === "porta") {
 			if (ev.ty >= 0 && ev.ty < grade.size()) {
 				const linha = grade[ev.ty];
 				grade[ev.ty] = linha.sub(1, ev.tx) + "." + linha.sub(ev.tx + 2);
 			}
 			camTileX = -1;
+		} else if (ev.tipo === "placar") {
+			preencherPlacar(ev.dados);
 		} else if (ev.tipo === "banner") {
 			mostrarBanner(ev.texto, ev.duracao);
 		} else if (ev.tipo === "fim") {
@@ -1087,6 +1143,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		fx.limpar();
 		chat.limpar();
 		nivelPendente = 0;
+		limparZonas();
+		zonaLobby = undefined;
+		if (placarAberto) {
+			fecharPlacar();
+		}
 	}
 
 	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
@@ -1296,6 +1357,137 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	});
 
+	// ===== Lobby: selo MAPAS, triggers e leaderboard =====
+	function zonaLobbyEm(tx: number, ty: number): "mapas" | "encant" | "rank" | undefined {
+		for (const z of LOBBY_ZONAS) {
+			if (tx >= z.x0 && tx <= z.x1 && ty >= z.y0 && ty <= z.y1) {
+				return z.id;
+			}
+		}
+		return undefined;
+	}
+
+	function construirZonas(): void {
+		limparZonas();
+		for (const z of LOBBY_ZONAS) {
+			const wx = z.x0 * TILE;
+			const wy = z.y0 * TILE;
+			const ww = (z.x1 - z.x0 + 1) * TILE;
+			const wh = (z.y1 - z.y0 + 1) * TILE;
+			const rect = novoQuadro(arena, `Z_${z.id}`, new UDim2(0, ww, 0, wh), new UDim2(0, 0, 0, 0), z.cor, 0.75);
+			rect.ZIndex = 3;
+			borda(rect, COR_TEXTO, 2);
+			const rotulo = novoTexto(
+				arena,
+				`ZL_${z.id}`,
+				z.nome,
+				16,
+				COR_TEXTO,
+				new UDim2(0, ww, 0, 28),
+				new UDim2(0, 0, 0, 0),
+			);
+			rotulo.ZIndex = 4;
+			zonaFrames.push({ rect: rect, rotulo: rotulo, wx: wx, wy: wy, wh: wh });
+		}
+	}
+
+	function limparZonas(): void {
+		for (const z of zonaFrames) {
+			z.rect.Destroy();
+			z.rotulo.Destroy();
+		}
+		zonaFrames.clear();
+	}
+
+	function abrirPlacar(): void {
+		if (telaPlacar === undefined) {
+			const tp = novoQuadro(
+				telaJogo,
+				"Placar",
+				new UDim2(0, 520, 0, 330),
+				new UDim2(0.5, -260, 0.5, -165),
+				COR_PAINEL,
+				0,
+			);
+			tp.ZIndex = 65;
+			tp.Visible = false;
+			borda(tp, COR_DESTAQUE, 3);
+			novoTexto(tp, "Titulo", "LEADERBOARDS", 20, COR_DESTAQUE, new UDim2(1, 0, 0, 32), new UDim2(0, 0, 0, 6));
+			const bf = novoBotao(tp, "Fechar", "X", new UDim2(0, 40, 0, 30), new UDim2(1, -50, 0, 6), COR_PERIGO, 14);
+			bf.Activated.Connect(() => fecharPlacar());
+			colPlacarNv = novoTexto(
+				tp,
+				"CNv",
+				"NÍVEL\ncarregando...",
+				13,
+				COR_TEXTO,
+				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 14, 0, 44),
+			);
+			colPlacarKill = novoTexto(
+				tp,
+				"CKill",
+				"MATANÇA\ncarregando...",
+				13,
+				COR_TEXTO,
+				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 185, 0, 44),
+			);
+			colPlacarMoeda = novoTexto(
+				tp,
+				"CMoed",
+				"MOEDAS\ncarregando...",
+				13,
+				COR_TEXTO,
+				new UDim2(0, 150, 0, 270),
+				new UDim2(0, 356, 0, 44),
+			);
+			for (const col of [colPlacarNv, colPlacarKill, colPlacarMoeda]) {
+				if (col !== undefined) {
+					col.TextXAlignment = Enum.TextXAlignment.Left;
+					col.TextYAlignment = Enum.TextYAlignment.Top;
+					col.TextWrapped = true;
+				}
+			}
+			telaPlacar = tp;
+		}
+		placarAberto = true;
+		const tp2 = telaPlacar;
+		if (tp2 !== undefined) {
+			tp2.Visible = true;
+		}
+	}
+
+	function fecharPlacar(): void {
+		placarAberto = false;
+		const tp = telaPlacar;
+		if (tp !== undefined) {
+			tp.Visible = false;
+		}
+	}
+
+	function preencherPlacar(dados: PlacarDados): void {
+		const monta = (linhas: { nome: string; valor: number }[]): string => {
+			if (linhas.size() === 0) {
+				return "— vazio —";
+			}
+			const partes: string[] = [];
+			for (let i = 0; i < linhas.size() && i < 10; i++) {
+				partes.push(`${i + 1}. ${linhas[i].nome} — ${linhas[i].valor}`);
+			}
+			return partes.join("\n");
+		};
+		if (colPlacarNv !== undefined) {
+			colPlacarNv.Text = `NÍVEL\n${monta(dados.nivel)}`;
+		}
+		if (colPlacarKill !== undefined) {
+			colPlacarKill.Text = `MATANÇA\n${monta(dados.kills)}`;
+		}
+		if (colPlacarMoeda !== undefined) {
+			colPlacarMoeda.Text = `MOEDAS\n${monta(dados.moedas)}`;
+		}
+	}
+
 	// ===== Loop de render =====
 	function suavizar(ent: EntFrame, x: number, y: number, dt: number, forca = 14): void {
 		if (ent.rx === 0 && ent.ry === 0) {
@@ -1412,6 +1604,28 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		debug.profilebegin("PQ_Tiles");
 		desenharTiles();
 		debug.profileend();
+
+		// Zonas do lobby: MAPAS abre o seletor, ENCANT avisa, RANK mostra o placar
+		if (foto.lobby) {
+			const zona = zonaLobbyEm(math.floor(foto.px / TILE), math.floor(foto.py / TILE));
+			if (zona !== zonaLobby) {
+				zonaLobby = zona;
+				if (zona === "mapas") {
+					abrirSeletor();
+				} else if (zona === "encant") {
+					mostrarBanner("ENCANTAMENTO — EM BREVE!", 2);
+				} else if (zona === "rank") {
+					Remotes.Client.Get("Placar").SendToServer();
+					abrirPlacar();
+				} else if (placarAberto) {
+					fecharPlacar();
+				}
+			}
+			for (const z of zonaFrames) {
+				z.rect.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy));
+				z.rotulo.Position = new UDim2(0, tX(z.wx), 0, tY(z.wy) + z.wh / 2 - 14);
+			}
+		}
 
 		// Jogador local
 		garantirPlayer();
@@ -1565,7 +1779,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			hudMoedas = foto.moedas;
 			txtMoedas.Text = `$ ${foto.moedas}`;
 		}
-		const ondaTxt = foto.bossFracao >= 0 ? "BOSS!" : `ÁREA ${foto.area + 1}`;
+		const ondaTxt = foto.lobby ? "LOBBY" : foto.bossFracao >= 0 ? "BOSS!" : `ÁREA ${foto.area + 1}`;
 		if (ondaTxt !== hudOnda) {
 			hudOnda = ondaTxt;
 			txtOnda.Text = ondaTxt;

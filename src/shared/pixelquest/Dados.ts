@@ -470,12 +470,14 @@ export interface Foto {
 	eqAcess: string;
 	pausado: boolean;
 	areasAbertas: number; // bitmask das áreas liberadas
+	lobby: boolean; // mundo atual é o lobby (sem inimigos/boss)
 }
 
 export type EventoPayload =
-	| { tipo: "mapa"; grade: string[]; seed: number }
+	| { tipo: "mapa"; grade: string[]; seed: number; lobby: boolean }
 	| { tipo: "porta"; tx: number; ty: number }
 	| { tipo: "banner"; texto: string; duracao: number }
+	| { tipo: "placar"; dados: PlacarDados }
 	| {
 			tipo: "fim";
 			venceu: boolean;
@@ -486,6 +488,49 @@ export type EventoPayload =
 			quests: number;
 			valor: number;
 	  };
+
+// ---------- Placar de líderes (top 10 por categoria) ----------
+export interface LinhaPlacar {
+	nome: string;
+	valor: number;
+}
+
+export interface PlacarDados {
+	nivel: LinhaPlacar[];
+	kills: LinhaPlacar[];
+	moedas: LinhaPlacar[];
+}
+
+// ---------- Lobby (layout fixo: 3 áreas + selo MAPAS) ----------
+export interface SalaLobby {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+export const LOBBY_SALAS: { [nome: string]: SalaLobby } = {
+	centro: { x: 24, y: 24, w: 12, h: 12 },
+	mapas: { x: 24, y: 4, w: 12, h: 10 },
+	encant: { x: 4, y: 24, w: 12, h: 12 },
+	rank: { x: 44, y: 24, w: 12, h: 12 },
+};
+
+export interface ZonaLobby {
+	id: "mapas" | "encant" | "rank";
+	nome: string;
+	x0: number;
+	y0: number;
+	x1: number;
+	y1: number;
+	cor: Color3;
+}
+
+export const LOBBY_ZONAS: ZonaLobby[] = [
+	{ id: "mapas", nome: "MAPAS", x0: 24, y0: 4, x1: 35, y1: 13, cor: Color3.fromRGB(94, 234, 212) },
+	{ id: "encant", nome: "ENCANTAMENTO", x0: 4, y0: 24, x1: 15, y1: 35, cor: Color3.fromRGB(155, 89, 182) },
+	{ id: "rank", nome: "LEADERBOARDS", x0: 44, y0: 24, x1: 55, y1: 35, cor: Color3.fromRGB(255, 213, 74) },
+];
 
 // ---------- Títulos (aba do painel; exibido abaixo do jogador) ----------
 export interface TituloInfo {

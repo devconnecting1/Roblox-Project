@@ -7,6 +7,7 @@ RPG top-down bullet-hell estilo Realm of the Mad God.
 **O loop:** explore a masmorra em todas as direções → desvie dos projéteis rosas →
 limpe cada área para abrir as portas → derrote a **Sereia da Praia** na área 5.
 Morreu? Ganha **Valor** para a próxima run (roguelike).
+- **Lobby (3 áreas):** JOGAR entra no lobby (mundo único por servidor — a party fica junta); pise no chão **MAPAS** (cima) para abrir o seletor; **ENCANTAMENTO** (esquerda) em breve; **LEADERBOARDS** (direita) com top 10 de Nível/Matança/Moedas (OrderedDataStores, cache 60s); fim de run tem botão LOBBY (regen + todos juntos)
 
 - Engine: [roblox-ts](https://roblox-ts.com/) 3.x (TypeScript → Luau)
 - Sync/build: [Rojo](https://rojo.space/) 7.7.0 (`servePort: 34872`)

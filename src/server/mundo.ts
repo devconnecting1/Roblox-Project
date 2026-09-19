@@ -7,7 +7,7 @@
  * (e a próxima área só então é povoada). A área 4 é a do boss.
  * Grade refeita a cada run (roguelike).
  */
-import { MUNDO_A, MUNDO_L, MUNDO_TX, MUNDO_TY, TILE, eSolido } from "shared/pixelquest/Dados";
+import { LOBBY_SALAS, MUNDO_A, MUNDO_L, MUNDO_TX, MUNDO_TY, TILE, eSolido } from "shared/pixelquest/Dados";
 
 export interface Sala {
 	x: number;
@@ -152,6 +152,44 @@ export function gerarMundo(): { portas: Porta[]; nasc: [number, number] } {
 	}
 	const s0 = bandas[0][0];
 	nasc = [(s0.cx + 0.5) * TILE, (s0.cy + 0.5) * TILE];
+	return { portas: portas, nasc: nasc };
+}
+
+/** Gera o lobby (layout fixo: centro + MAPAS em cima, ENCANT esq, RANK dir). */
+export function gerarLobby(): { portas: Porta[]; nasc: [number, number] } {
+	grade = [];
+	for (let ty = 0; ty < MUNDO_TY; ty++) {
+		const linha: string[] = [];
+		for (let tx = 0; tx < MUNDO_TX; tx++) {
+			linha.push("R");
+		}
+		grade.push(linha);
+	}
+	portas = [];
+	const cavarSala = (x: number, y: number, w: number, h: number): void => {
+		for (let yy = y; yy < y + h; yy++) {
+			for (let xx = x; xx < x + w; xx++) {
+				porChao(xx, yy);
+			}
+		}
+	};
+	const c = LOBBY_SALAS["centro"];
+	const m = LOBBY_SALAS["mapas"];
+	const e = LOBBY_SALAS["encant"];
+	const r = LOBBY_SALAS["rank"];
+	cavarSala(c.x, c.y, c.w, c.h);
+	cavarSala(m.x, m.y, m.w, m.h);
+	cavarSala(e.x, e.y, e.w, e.h);
+	cavarSala(r.x, r.y, r.w, r.h);
+	// Corredores: centro↔cima, centro↔esq, centro↔dir (2 de largura, sem portas)
+	escavarH(29, 29, 30, undefined, undefined);
+	escavarV(29, m.y + m.h, c.y + 1);
+	escavarV(30, m.y + m.h, c.y + 1);
+	escavarH(29, e.x + e.w, c.x + 1, undefined, undefined);
+	escavarH(30, e.x + e.w, c.x + 1, undefined, undefined);
+	escavarH(29, c.x + c.w - 1, r.x, undefined, undefined);
+	escavarH(30, c.x + c.w - 1, r.x, undefined, undefined);
+	nasc = [(c.x + c.w / 2) * TILE, (c.y + c.h / 2) * TILE];
 	return { portas: portas, nasc: nasc };
 }
 
