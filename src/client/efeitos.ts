@@ -23,6 +23,78 @@ interface ParticulaNivel {
 	t: number;
 }
 
+interface Brasa {
+	f: Frame;
+	x: number;
+	y: number;
+	v: number;
+	fase: number;
+}
+
+/** Brasas subindo + glow de fogo no fundo (ambiente do seletor). */
+export function criarBrasas(pai: Frame, visivel: () => boolean): void {
+	const brasas: Brasa[] = [];
+	const cores = [Color3.fromRGB(255, 140, 40), Color3.fromRGB(255, 180, 60), Color3.fromRGB(200, 60, 30)];
+	for (let i = 0; i < 24; i++) {
+		const tam = 3 + math.random() * 4;
+		const f = novoQuadro(pai, `Br${i}`, new UDim2(0, tam, 0, tam), new UDim2(0, -50, 0, -50), cores[i % 3], 0.4);
+		f.ZIndex = 2;
+		f.Visible = false;
+		brasas.push({
+			f: f,
+			x: math.random(),
+			y: 1 + math.random() * 0.1,
+			v: 0.04 + math.random() * 0.05,
+			fase: math.random() * 6.28,
+		});
+	}
+	const glows: Frame[] = [];
+	for (let k = 0; k < 3; k++) {
+		const g = novoQuadro(
+			pai,
+			`Glow${k}`,
+			new UDim2(1, 0, 0, 120 - k * 40),
+			new UDim2(0, 0, 1, -120 + k * 40),
+			Color3.fromRGB(255, 110, 25),
+			0.93 - k * 0.02,
+		);
+		g.ZIndex = 1;
+		g.Visible = false;
+		glows.push(g);
+	}
+	let tempo = 0;
+	task.spawn(() => {
+		while (true) {
+			if (visivel()) {
+				tempo += 0.03;
+				for (const b of brasas) {
+					b.y -= b.v * 0.03;
+					if (b.y < -0.05) {
+						b.y = 1.05;
+						b.x = math.random();
+					}
+					b.f.Position = new UDim2(b.x + math.sin(tempo * 1.5 + b.fase) * 0.004, 0, b.y, 0);
+					b.f.BackgroundTransparency = 0.35 + 0.3 * math.sin(tempo * 3 + b.fase);
+					b.f.Visible = true;
+				}
+				for (let k = 0; k < glows.size(); k++) {
+					const g = glows[k];
+					g.BackgroundTransparency = 0.91 + 0.02 * math.sin(tempo * 1.5 + k * 2);
+					g.Visible = true;
+				}
+			} else {
+				for (const b of brasas) {
+					b.f.Visible = false;
+				}
+				for (const g of glows) {
+					g.Visible = false;
+				}
+			}
+			task.wait(0.03);
+		}
+	});
+}
+
 export interface FxHandle {
 	floater: (sx: number, sy: number, texto: string, cor: Color3) => void;
 	iniciarNivel: (

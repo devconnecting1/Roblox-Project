@@ -46,7 +46,7 @@ import {
 	novoTexto,
 	TOPO_Y,
 } from "./ui";
-import { criarEfeitos } from "./efeitos";
+import { criarBrasas, criarEfeitos } from "./efeitos";
 import { criarChat } from "./chat";
 
 // ---------- Tipos internos (render) ----------
@@ -99,8 +99,18 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		14,
 		Color3.fromRGB(160, 175, 195),
 		new UDim2(1, 0, 0, 22),
-		new UDim2(0, 0, 0, 100),
+		new UDim2(0, 0, 0, 96),
 	);
+	const txtCartaSel = novoTexto(
+		telaMapas,
+		"CartaSel",
+		"",
+		18,
+		COR_TEXTO,
+		new UDim2(1, 0, 0, 24),
+		new UDim2(0, 0, 0, 120),
+	);
+	txtCartaSel.ZIndex = 20;
 	const ajudaMapas = novoTexto(
 		telaMapas,
 		"Ajuda",
@@ -177,12 +187,18 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		for (let i = 0; i < cardsMapa.size(); i++) {
 			const c = cardsMapa[i];
 			const z = alvoCarta(i - slotSel).z + 1;
+			const naFrente = i === slotSel;
 			c.btn.ZIndex = z - 1;
 			c.head.ZIndex = z;
 			c.mid.ZIndex = z;
 			c.foot.ZIndex = z;
 			c.lockCorpo.ZIndex = z;
 			c.lockArco.ZIndex = z;
+			c.head.Visible = naFrente;
+			c.mid.Visible = naFrente;
+			c.foot.Visible = naFrente;
+			c.lockCorpo.Visible = naFrente && i !== 0;
+			c.lockArco.Visible = naFrente && i !== 0;
 		}
 		const de: { x: number; w: number; h: number }[] = [];
 		for (const c of cardsMapa) {
@@ -219,10 +235,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"Voltar",
 		"← VOLTAR",
 		new UDim2(0, 220, 0, 54),
-		new UDim2(0.5, -110, 0.62, 0),
+		new UDim2(0.5, -110, 0.5, 140),
 		COR_PAINEL,
 		18,
 	);
+	btnVoltarMapas.ZIndex = 20;
 	const avisoMapas = novoTexto(
 		telaMapas,
 		"Aviso",
@@ -230,8 +247,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		16,
 		COR_TEXTO,
 		new UDim2(0, 520, 0, 26),
-		new UDim2(0.5, -260, 0.72, 0),
+		new UDim2(0.5, -260, 0.5, 200),
 	);
+	avisoMapas.ZIndex = 20;
 
 	// ----- Tela do jogo (tela cheia) -----
 	const telaJogo = novoQuadro(gui, "Jogo", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
@@ -528,6 +546,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	});
 	const chat = criarChat(telaJogo);
+	criarBrasas(telaMapas, () => telaMapas.Visible);
 
 	// Input PC (só envia; servidor decide)
 	let teclaCima = false;
@@ -833,8 +852,20 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	}
 
+	function atualizarInfoCarta(): void {
+		const m = MAPAS[slotSel];
+		if (slotSel === 0) {
+			txtCartaSel.Text = `MAPA 1 — ${m.nome}`;
+			txtCartaSel.TextColor3 = COR_TEXTO;
+		} else {
+			txtCartaSel.Text = `MAPA ${slotSel + 1} — Nv ${m.reqNivel} • EM BREVE`;
+			txtCartaSel.TextColor3 = Color3.fromRGB(150, 160, 175);
+		}
+	}
+
 	function abrirSeletor(): void {
 		atualizarSeletor();
+		atualizarInfoCarta();
 		telaFim.Visible = false;
 		telaMapas.Visible = true;
 		estado = "mapas";
@@ -931,6 +962,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			} else {
 				slotSel = idx;
 				posicionarCards(true);
+				atualizarInfoCarta();
 			}
 		});
 	}
