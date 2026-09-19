@@ -633,7 +633,7 @@ function jogadorMaisProximo(x: number, y: number): JogadorS | undefined {
 	return melhor;
 }
 
-const ALCANCE_VISAO = 420;
+const ALCANCE_VISAO = VISAO; // simétrico: o fog é O limite de visão dos dois lados
 
 function tileSolidoEm(x: number, y: number): boolean {
 	const tx = math.floor(x / TILE);
@@ -1022,7 +1022,7 @@ export function atualizar(dt: number): void {
 
 // ---------- Snapshot (só o visível: Fog of War real) ----------
 function visivelPara(js: JogadorS, x: number, y: number): boolean {
-	return dist2(js.x, js.y, x, y) < VISAO * VISAO;
+	return dist2(js.x, js.y, x, y) < VISAO * VISAO && temVisada(js.x, js.y, x, y);
 }
 
 function enviarFoto(js: JogadorS): void {

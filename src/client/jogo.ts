@@ -13,6 +13,7 @@ import { Players, RunService, StarterGui, UserInputService, Workspace } from "@r
 import {
 	CLASSES,
 	COR_TILE,
+	eSolido,
 	ITEM_POR_ID,
 	MAPAS,
 	MUNDO_TX,
@@ -40,7 +41,6 @@ interface Flutuante {
 
 interface TilePool {
 	frame: Frame;
-	detalhe: Frame;
 }
 
 // ---------- Cores ----------
@@ -62,6 +62,9 @@ for (const ch of ["W", "~", ".", ",", "G", "T", "*", "R", "D"]) {
 	const cor = COR_TILE[ch];
 	COR_ESCURA[ch] = new Color3(cor.R * 0.32, cor.G * 0.32, cor.B * 0.32);
 }
+
+// ID numérico por char p/ chave do cache (charCodeAt não existe no roblox-ts)
+const ID_CH: { [chave: string]: number } = { W: 0, "~": 1, ".": 2, ",": 3, G: 4, T: 5, "*": 6, R: 7, D: 8 };
 
 // ---------- Fonte ----------
 const FONTE_ID = 0;
@@ -448,11 +451,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				COR_FUNDO,
 				0,
 			);
-			f.ZIndex = 1;
-			const d = novoQuadro(f, "D", new UDim2(0, 20, 0, 20), new UDim2(0, 14, 0, 10), COR_FUNDO, 0);
-			d.ZIndex = 2;
-			d.Visible = false;
-			tiles.push({ frame: f, detalhe: d });
+		f.ZIndex = 1;
+		f.Visible = false;
+		tiles.push({ frame: f });
 		}
 		camTileX = -1;
 		camTileY = -1;
@@ -467,11 +468,41 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		return grade[ty].sub(tx + 1, tx + 1);
 	}
 
+	/** Linha de visão do jogador: parede bloqueia (igual à dos inimigos). */
+	function haVisada(x1: number, y1: number, x2: number, y2: number): boolean {
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		const d = math.sqrt(dx * dx + dy * dy);
+		if (d > VISAO || d < 1) {
+			return d < 1;
+		}
+		const passos = math.floor(d / 12);
+		for (let i = 1; i <= passos; i++) {
+			const t = i / (passos + 1);
+			const tx = math.floor((x1 + dx * t) / TILE);
+			const ty = math.floor((y1 + dy * t) / TILE);
+			if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
+				continue; // vazio fora do mapa não bloqueia
+			}
+			if (eSolido(charGrade(tx, ty))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	let expTX = -999;
+	let expTY = -999;
+
 	function marcarExplorado(): void {
-		const r = VISAO / TILE;
 		const pcx = math.floor(px / TILE);
 		const pcy = math.floor(py / TILE);
-		const rr = math.ceil(r);
+		if (pcx === expTX && pcy === expTY) {
+			return; // parado no mesmo tile: nada novo para explorar
+		}
+		expTX = pcx;
+		expTY = pcy;
+		const rr = math.ceil(VISAO / TILE);
 		for (let ty = pcy - rr; ty <= pcy + rr; ty++) {
 			for (let tx = pcx - rr; tx <= pcx + rr; tx++) {
 				if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
@@ -479,12 +510,17 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				}
 				const dx = (tx + 0.5) * TILE - px;
 				const dy = (ty + 0.5) * TILE - py;
-				if (dx * dx + dy * dy < VISAO * VISAO) {
+				if (dx * dx + dy * dy < VISAO * VISAO && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE)) {
 					explorado[ty * MUNDO_TX + tx] = true;
 				}
 			}
 		}
 	}
+
+	// Cache por tile DO MUNDO (não do slot da tela): só reescreve o que mudou
+	// de aparência (char + estado de névoa). Correto sob scroll, ao contrário
+	// de cache por slot — e o mapa continua sendo só dado (60 strings).
+	let cacheMundo: number[] = [];
 
 	function desenharTiles(): void {
 		const camada = camadaTiles;
@@ -509,29 +545,31 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const tx = tx0 + (i % tilesCols);
 			const ty = ty0 + math.floor(i / tilesCols);
 			const t = tiles[i];
-			const ch = tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY ? charGrade(tx, ty) : "R";
+			const dentro = tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY;
+			const ch = dentro ? charGrade(tx, ty) : "R";
 			const cx = (tx + 0.5) * TILE - px;
 			const cy = (ty + 0.5) * TILE - py;
-			const vis = cx * cx + cy * cy < VISAO * VISAO;
-			const exp = tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY && explorado[ty * MUNDO_TX + tx];
+			const perto = cx * cx + cy * cy < VISAO * VISAO;
+			const vis = perto && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
+			const exp = dentro && explorado[ty * MUNDO_TX + tx];
+			const est = vis ? 2 : exp ? 1 : 0;
+			const chave = (ID_CH[ch] ?? 9) * 4 + est;
+			const idx = dentro ? ty * MUNDO_TX + tx : -1;
+			if (idx >= 0 && cacheMundo[idx] === chave) {
+				continue; // aparência idêntica: pula a escrita
+			}
+			if (idx >= 0) {
+				cacheMundo[idx] = chave;
+			}
+			if (!vis && !exp) {
+				t.frame.Visible = false; // inexplorado: some (fundo preto)
+				continue;
+			}
+			t.frame.Visible = true;
 			if (vis) {
 				t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
-			} else if (exp) {
+			} else {
 				t.frame.BackgroundColor3 = COR_ESCURA[ch] ?? COR_DESCONHECIDO;
-			} else {
-				t.frame.BackgroundColor3 = COR_DESCONHECIDO;
-			}
-			if (vis && (ch === "T" || ch === "*" || ch === "R" || ch === "D")) {
-				t.detalhe.Visible = true;
-				if (ch === "R") {
-					t.detalhe.BackgroundColor3 = Color3.fromRGB(30, 32, 38);
-				} else if (ch === "D") {
-					t.detalhe.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
-				} else {
-					t.detalhe.BackgroundColor3 = Color3.fromRGB(20, 90, 50);
-				}
-			} else {
-				t.detalhe.Visible = false;
 			}
 		}
 	}
@@ -709,6 +747,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			camTileY = -1;
 			nevoaTileX = -999;
 			nevoaTileY = -999;
+			expTX = -999;
+			expTY = -999;
+			cacheMundo = []; // grade nova: invalida o cache de aparência
 		} else if (ev.tipo === "porta") {
 			if (ev.ty >= 0 && ev.ty < grade.size()) {
 				const linha = grade[ev.ty];

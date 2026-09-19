@@ -45,8 +45,9 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 
 - **Mundo quadrado 2880×2880 procedural:** 5 áreas longas com salas + corredores; portas ciano abrem só ao limpar a área (áreas trancadas nascem vazias e só são povoadas ao liberar a anterior); área 5 tem o boss (spawna ao entrar)
 - **IA com sentidos:** inimigos só enxergam com linha de visão (paredes bloqueiam, alcance 420px), guardam a última posição vista, vasculham e desistem; quem avista **alerta a equipe** próxima para caçar junto; patrulha com coleira na âncora; tiros e rajadas só com visão
-- **Fog of War:** só o visível é enviado/renderizado; explorado fica escurecido, inexplorado preto (sem minimapa)
-- **Otimizado:** snapshots 20Hz, recolor de tiles só no que muda de estado, sem simulação sem jogadores, teto de balas, câmera sem travas (borda mostra Rocha)
+- **Fog of War com linha de visão (simétrico):** parede bloqueia a visão do jogador E dos inimigos; o fog é o limite de visão dos dois lados; explorado fica escurecido, inexplorado some (fundo preto); balas morrem na parede
+- **Tiles chapados + cache por tile do mundo:** paredes cinza sem detalhe, inexplorado invisível; o mapa é só dado (60 strings) e a tela é uma janela deslizante — o cache (char + estado de névoa por tile) pula ~90% das escritas no scroll
+- **Otimizado:** snapshots 20Hz, sem simulação sem jogadores, teto de balas, explorado recalculado só ao trocar de tile, câmera sem travas (borda mostra Rocha)
 - **Sem ondas:** inimigos nascem nos caminhos de cada área liberada; progressão = limpar → avançar
 - **Seletor de mapas (5 slots):** Mapa 1 liberado para todos; Mapas 2–5 mostram `Nv 10/20/30/40 • EM BREVE` (desbloqueio pelo Nível da conta nos leaderstats)
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
