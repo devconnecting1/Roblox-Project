@@ -217,6 +217,18 @@ export function gradeStrings(): string[] {
 	return linhas;
 }
 
+/** Restaura a grade a partir das linhas (dungeon pré-gerada). */
+export function definirGrade(linhas: string[]): void {
+	grade = [];
+	for (const linha of linhas) {
+		const vetor: string[] = [];
+		for (let i = 1; i <= linha.size(); i++) {
+			vetor.push(linha.sub(i, i));
+		}
+		grade.push(vetor);
+	}
+}
+
 /** Área (0–4) da posição em px. */
 export function areaDe(x: number): number {
 	const a = math.floor(x / TILE / LARG_BANDA);

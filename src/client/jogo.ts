@@ -1236,6 +1236,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		entCots = {};
 		chavesCots = [];
 		inimigosVistos = {};
+		for (const t of tiles) {
+			t.frame.Visible = false; // sem frame velho: preto até a nova grade chegar
+		}
 		if (framePlayer !== undefined) {
 			framePlayer.Destroy();
 			framePlayer = undefined;
