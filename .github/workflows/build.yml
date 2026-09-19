@@ -26,10 +26,12 @@ jobs:
       - name: roblox-ts build (TS -> Luau)
         run: npm run build
 
-      - name: Instalar Rojo
-        uses: rojo-rbx/setup-rojo@v0
-        with:
-          global: true
+      - name: Instalar Rojo 7.7.0
+        run: |
+          curl -sL https://github.com/rojo-rbx/rojo/releases/download/v7.7.0/rojo-7.7.0-linux-x86_64.zip -o /tmp/rojo.zip
+          unzip -o /tmp/rojo.zip -d /tmp
+          sudo mv /tmp/rojo /usr/local/bin/rojo
+          rojo --version
 
       - name: Rojo build (.rbxlx)
         run: rojo build -o build.rbxlx
