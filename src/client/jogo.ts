@@ -338,7 +338,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	const tiles: TilePool[] = [];
 	let camadaTiles: Frame | undefined = undefined;
-	let tileEstado: number[] = []; // 0=desconhecido 1=escuro 2=visível (recolor só no que muda)
 	let tilesCols = 0;
 	let tilesRows = 0;
 	let camTileX = -1;
@@ -429,7 +428,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			t.frame.Destroy();
 		}
 		tiles.clear();
-		tileEstado = [];
 		if (camadaTiles !== undefined) {
 			camadaTiles.Destroy();
 		}
@@ -455,7 +453,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			d.ZIndex = 2;
 			d.Visible = false;
 			tiles.push({ frame: f, detalhe: d });
-			tileEstado.push(-1);
 		}
 		camTileX = -1;
 		camTileY = -1;
@@ -517,12 +514,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const cy = (ty + 0.5) * TILE - py;
 			const vis = cx * cx + cy * cy < VISAO * VISAO;
 			const exp = tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY && explorado[ty * MUNDO_TX + tx];
-			// Otimização: só toca no tile cujo estado de névoa mudou
-			const est = vis ? 2 : exp ? 1 : 0;
-			if (est === tileEstado[i]) {
-				continue;
-			}
-			tileEstado[i] = est;
 			if (vis) {
 				t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
 			} else if (exp) {
