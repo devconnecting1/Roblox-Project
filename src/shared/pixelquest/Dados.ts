@@ -99,7 +99,7 @@ export function acharChaoPerto(x: number, y: number, raio: number): [number, num
 	return [MUNDO_L / 2, MUNDO_A / 2];
 }
 
-// ---------- Classes jogáveis (Guerreiro 46HP / Mago 36HP) ----------
+// ---------- Classe única (por enquanto) ----------
 export interface ClasseInfo {
 	nome: string;
 	descricao: string;
@@ -114,38 +114,60 @@ export interface ClasseInfo {
 
 export const CLASSES: ClasseInfo[] = [
 	{
-		nome: "Guerreiro",
-		descricao: "Muralha de ferro. Bate forte, aguenta mais.",
-		hpMax: 46,
-		dano: 12,
-		cadencia: 0.45,
-		velTiro: 430,
-		velocidade: 175,
+		nome: "Aventureiro",
+		descricao: "Equilibrado e corajoso. Pronto para a ilha.",
+		hpMax: 42,
+		dano: 9,
+		cadencia: 0.3,
+		velTiro: 460,
+		velocidade: 185,
 		cor: Color3.fromRGB(231, 76, 60),
 		tamTiro: 8,
 	},
-	{
-		nome: "Mago",
-		descricao: "Corpo frágil, magia devastadora.",
-		hpMax: 36,
-		dano: 9,
-		cadencia: 0.27,
-		velTiro: 470,
-		velocidade: 180,
-		cor: Color3.fromRGB(88, 140, 255),
-		tamTiro: 10,
-	},
-	{
-		nome: "Ladino",
-		descricao: "Rápido e silencioso. Chuva de adagas.",
-		hpMax: 40,
-		dano: 6,
-		cadencia: 0.16,
-		velTiro: 530,
-		velocidade: 215,
-		cor: Color3.fromRGB(88, 214, 141),
-		tamTiro: 6,
-	},
+];
+
+// ---------- Itens (mochila + equipamentos) ----------
+export type SlotItem = "arma" | "armadura" | "acess";
+
+export interface ItemInfo {
+	id: string;
+	nome: string;
+	slot: SlotItem;
+	dano: number;
+	hp: number;
+	descricao: string;
+	preco: number; // moedas ao vender duplicata
+}
+
+export const NOME_SLOT: { [k: string]: string } = {
+	arma: "Arma",
+	armadura: "Armadura",
+	acess: "Acessório",
+};
+
+export const ITENS_INICIAIS: ItemInfo[] = [
+	{ id: "espada_treino", nome: "Espada de Treino", slot: "arma", dano: 0, hp: 0, descricao: "Confiável e sem graça.", preco: 5 },
+	{ id: "traje_pano", nome: "Traje de Pano", slot: "armadura", dano: 0, hp: 0, descricao: "Melhor que nada.", preco: 5 },
+];
+
+export const LOOT_COMUM: ItemInfo[] = [
+	{ id: "espada_ferro", nome: "Espada de Ferro", slot: "arma", dano: 3, hp: 0, descricao: "+3 de dano.", preco: 12 },
+	{ id: "armadura_couro", nome: "Armadura de Couro", slot: "armadura", dano: 0, hp: 10, descricao: "+10 de HP máx.", preco: 12 },
+];
+
+export const ANEL_VALOR: ItemInfo = {
+	id: "anel_valor",
+	nome: "Anel de Valor",
+	slot: "acess",
+	dano: 1,
+	hp: 5,
+	descricao: "+1 dano, +5 HP. Recompensa de quest.",
+	preco: 20,
+};
+
+export const LOOT_BOSS: ItemInfo[] = [
+	{ id: "espada_runica", nome: "Espada Rúnica", slot: "arma", dano: 6, hp: 0, descricao: "+6 de dano. Loot da Sereia.", preco: 30 },
+	{ id: "cota_malha", nome: "Cota de Malha", slot: "armadura", dano: 0, hp: 20, descricao: "+20 de HP máx. Loot da Sereia.", preco: 30 },
 ];
 
 // ---------- Inimigos do bioma ----------

@@ -10,17 +10,24 @@
  */
 import { Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
 import {
+	ANEL_VALOR,
 	BOSS,
 	CLASSES,
 	COR_TILE,
 	INIMIGOS,
+	ITENS_INICIAIS,
 	InimigoInfo,
+	ItemInfo,
+	LOOT_BOSS,
+	LOOT_COMUM,
 	MUNDO_A,
 	MUNDO_L,
 	MUNDO_TX,
 	MUNDO_TY,
+	NOME_SLOT,
 	ONDA_BOSS,
 	QUESTS,
+	SlotItem,
 	TILE,
 	acharChaoPerto,
 	areaSolida,
@@ -102,6 +109,26 @@ const COR_BALA_INIMIGA = Color3.fromRGB(255, 70, 180);
 const TOPO_Y = 36; // abaixo da topbar nativa do Roblox
 const MAX_PONTOS_MINIMAPA = 30;
 
+// ---------- Fonte ----------
+// Geist (ou similar) NÃO existe no Roblox por padrão: para usá-la, suba o
+// TTF em Creator Dashboard → Development Items → Fonts e coloque o asset ID
+// em FONTE_ID. Com 0, usa a Gotham embutida (confiável em toda plataforma).
+const FONTE_ID = 0;
+function fonteJogo(peso: Enum.FontWeight): Font {
+	if (FONTE_ID > 0) {
+		return Font.fromId(FONTE_ID, peso);
+	}
+	return Font.fromName("Gotham", peso);
+}
+/** Contorno em TODO texto: legível sobre qualquer fundo. */
+function contornoTexto(inst: TextLabel | TextButton): void {
+	const s = new Instance("UIStroke");
+	s.Color = Color3.fromRGB(10, 12, 16);
+	s.Thickness = 2;
+	s.Transparency = 0.25;
+	s.Parent = inst;
+}
+
 // ---------- Helpers de UI ----------
 function borda(inst: GuiObject, cor: Color3, grossura: number): void {
 	const s = new Instance("UIStroke");
@@ -134,7 +161,7 @@ function novoTexto(
 	const l = new Instance("TextLabel");
 	l.Name = nome;
 	l.Text = texto;
-	l.Font = Enum.Font.GothamBold;
+	l.FontFace = fonteJogo(Enum.FontWeight.Bold);
 	l.TextSize = tamFonte;
 	l.TextColor3 = cor;
 	l.BackgroundTransparency = 1;
@@ -142,6 +169,7 @@ function novoTexto(
 	l.Position = pos;
 	l.TextXAlignment = Enum.TextXAlignment.Center;
 	l.Parent = pai;
+	contornoTexto(l);
 	return l;
 }
 
@@ -157,7 +185,7 @@ function novoBotao(
 	const b = new Instance("TextButton");
 	b.Name = nome;
 	b.Text = texto;
-	b.Font = Enum.Font.GothamBlack;
+	b.FontFace = fonteJogo(Enum.FontWeight.ExtraBold);
 	b.TextSize = tamFonte;
 	b.TextColor3 = COR_TEXTO;
 	b.BackgroundColor3 = corFundo;
@@ -167,6 +195,7 @@ function novoBotao(
 	b.AutoButtonColor = true;
 	b.Parent = pai;
 	borda(b, COR_TEXTO, 2);
+	contornoTexto(b);
 	return b;
 }
 
@@ -191,10 +220,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	gui.ResetOnSpawn = false;
 	gui.IgnoreGuiInset = true;
 	gui.DisplayOrder = 10;
+	// Sibling: ZIndex só compete entre irmãos — HUD (irmã da arena, Z alto)
+	// fica SEMPRE acima do mapa, sem precisar caçar ZIndex de tile.
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
 	gui.Parent = playerGui;
 
 	// ----- Menu -----
 	const telaMenu = novoQuadro(gui, "Menu", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+	telaMenu.ZIndex = 70;
 	novoTexto(telaMenu, "Titulo", "PIXEL QUEST 2D", 56, COR_DESTAQUE, new UDim2(1, 0, 0, 80), new UDim2(0, 0, 0, 60));
 	novoTexto(
 		telaMenu,
@@ -205,36 +238,33 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		new UDim2(1, 0, 0, 30),
 		new UDim2(0, 0, 0, 145),
 	);
-	novoTexto(telaMenu, "Escolha", "— ESCOLHA SUA CLASSE —", 22, COR_TEXTO, new UDim2(1, 0, 0, 30), new UDim2(0, 0, 0, 195));
+	novoTexto(telaMenu, "Escolha", "— UMA CLASSE, UMA ILHA, 5 ONDAS —", 22, COR_TEXTO, new UDim2(1, 0, 0, 30), new UDim2(0, 0, 0, 195));
 
-	const botoesClasse: TextButton[] = [];
-	for (let i = 0; i < CLASSES.size(); i++) {
-		const c = CLASSES[i];
-		const b = novoBotao(
-			telaMenu,
-			`Classe${i}`,
-			`${c.nome}\nHP ${c.hpMax} | Dano ${c.dano}`,
-			new UDim2(0, 220, 0, 90),
-			new UDim2(0.5, -360 + i * 250, 0, 245),
-			COR_PAINEL,
-			18,
-		);
-		b.TextColor3 = c.cor;
-		botoesClasse.push(b);
-	}
+	const infoClasse = CLASSES[0];
+	novoTexto(
+		telaMenu,
+		"ClasseInfo",
+		`${infoClasse.nome} — ${infoClasse.descricao}\nHP ${infoClasse.hpMax} | Dano ${infoClasse.dano}`,
+		18,
+		infoClasse.cor,
+		new UDim2(1, 0, 0, 60),
+		new UDim2(0, 0, 0, 232),
+	);
+	const btnJogar = novoBotao(telaMenu, "Jogar", "▶  JOGAR", new UDim2(0, 300, 0, 70), new UDim2(0.5, -150, 0, 305), COR_PAINEL, 26);
 	const ajuda = novoTexto(
 		telaMenu,
 		"Ajuda",
-		"PC: WASD/setas para mover em todas as direções | Tiro automático no inimigo mais próximo\nSHIFT/L: dash com invencibilidade | P: pausar | Desvie das balas rosas e explore a ilha!",
+		"PC: WASD/setas para mover em todas as direções | Tiro automático no inimigo mais próximo\nSHIFT/L: dash com invencibilidade | P: pausar | ≡ OPÇÕES: tarefas, mochila e equipamentos | Desvie das balas rosas!",
 		15,
 		Color3.fromRGB(160, 175, 195),
 		new UDim2(1, -40, 0, 60),
-		new UDim2(0, 20, 0, 360),
+		new UDim2(0, 20, 0, 395),
 	);
 	ajuda.TextWrapped = true;
 
 	// ----- Tela do jogo (tela cheia) -----
 	const telaJogo = novoQuadro(gui, "Jogo", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+	telaJogo.ZIndex = 1;
 	telaJogo.Visible = false;
 	telaJogo.ClipsDescendants = true;
 
@@ -242,14 +272,17 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const arena = novoQuadro(telaJogo, "Arena", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	arena.ClipsDescendants = true;
 
-	// HUD superior (abaixo da topbar nativa)
+	// HUD superior (abaixo da topbar nativa; moedas longe dos botões ☰/chat)
 	const hud = novoQuadro(telaJogo, "HUD", new UDim2(1, 0, 0, 40), new UDim2(0, 0, 0, TOPO_Y), COR_PAINEL, 0.1);
-	const txtMoedas = novoTexto(hud, "Moedas", "$ 0", 18, COR_DESTAQUE, new UDim2(0, 140, 0, 40), new UDim2(0, 12, 0, 0));
+	hud.ZIndex = 50;
+	const txtMoedas = novoTexto(hud, "Moedas", "$ 0", 18, COR_DESTAQUE, new UDim2(0, 150, 0, 40), new UDim2(0, 175, 0, 0));
 	const txtOnda = novoTexto(hud, "Onda", "ONDA 1", 18, COR_TEXTO, new UDim2(0, 200, 0, 40), new UDim2(0.5, -100, 0, 0));
+	const btnOpcoes = novoBotao(hud, "Opcoes", "≡ OPÇÕES", new UDim2(0, 140, 0, 30), new UDim2(1, -212, 0, 5), COR_PAINEL, 16);
 	const botPausa = novoBotao(hud, "Pausa", "II", new UDim2(0, 52, 0, 30), new UDim2(1, -62, 0, 5), COR_PAINEL, 16);
 
 	// Painel de quests (esquerda)
 	const painelQuests = novoQuadro(telaJogo, "Quests", new UDim2(0, 215, 0, 150), new UDim2(0, 10, 0, TOPO_Y + 50), COR_PAINEL, 0.15);
+	painelQuests.ZIndex = 50;
 	novoTexto(painelQuests, "Titulo", "QUESTS", 15, COR_DESTAQUE, new UDim2(1, 0, 0, 24), new UDim2(0, 0, 0, 4));
 	const linhasQuest: TextLabel[] = [];
 	for (let i = 0; i < QUESTS.size(); i++) {
@@ -271,6 +304,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		Color3.fromRGB(20, 60, 110),
 		0,
 	);
+	minimapa.ZIndex = 50;
 	borda(minimapa, COR_TEXTO, 2);
 	const pontoPlayer = novoQuadro(minimapa, "Voce", new UDim2(0, 5, 0, 5), new UDim2(0, 0, 0, 0), COR_TEXTO, 0);
 	pontoPlayer.ZIndex = 3;
@@ -284,15 +318,44 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	// Banner central + barra do boss
 	const banner = novoTexto(telaJogo, "Banner", "", 34, COR_DESTAQUE, new UDim2(1, 0, 0, 50), new UDim2(0, 0, 0.35, 0));
+	banner.ZIndex = 60;
 	banner.Visible = false;
 	const barraBossFundo = novoQuadro(telaJogo, "BossFundo", new UDim2(0, 400, 0, 14), new UDim2(0.5, -200, 0, TOPO_Y + 46), Color3.fromRGB(60, 10, 40), 0);
+	barraBossFundo.ZIndex = 60;
 	barraBossFundo.Visible = false;
 	const barraBoss = novoQuadro(barraBossFundo, "Boss", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_PERIGO, 0);
 	const txtBoss = novoTexto(telaJogo, "BossNome", "", 16, COR_TEXTO, new UDim2(0, 400, 0, 22), new UDim2(0.5, -200, 0, TOPO_Y + 62));
+	txtBoss.ZIndex = 60;
 	txtBoss.Visible = false;
 
-	// ----- Tela de fim -----
-	const telaFim = novoQuadro(gui, "Fim", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0.25);
+	// ----- Painel de opções (diálogo horizontal: tarefas, mochila, equipamentos)
+	const painel = novoQuadro(telaJogo, "Painel", new UDim2(0, 560, 0, 400), new UDim2(0.5, -280, 0.5, -200), COR_PAINEL, 0);
+	painel.ZIndex = 65;
+	painel.Visible = false;
+	borda(painel, COR_DESTAQUE, 3);
+	const tituloPainel = novoTexto(painel, "Titulo", "OPÇÕES", 22, COR_DESTAQUE, new UDim2(1, -60, 0, 36), new UDim2(0, 0, 0, 6));
+	const abaMissoes = novoBotao(painel, "AbaMissoes", "TAREFAS", new UDim2(0, 150, 0, 34), new UDim2(0, 14, 0, 48), COR_FUNDO, 15);
+	const abaMochila = novoBotao(painel, "AbaMochila", "MOCHILA", new UDim2(0, 150, 0, 34), new UDim2(0, 172, 0, 48), COR_FUNDO, 15);
+	const abaEquip = novoBotao(painel, "AbaEquip", "EQUIP.", new UDim2(0, 150, 0, 34), new UDim2(0, 330, 0, 48), COR_FUNDO, 15);
+	const btnFecharPainel = novoBotao(painel, "Fechar", "X", new UDim2(0, 40, 0, 34), new UDim2(1, -50, 0, 8), COR_PERIGO, 16);
+	const rolagem = new Instance("ScrollingFrame");
+	rolagem.Name = "Lista";
+	rolagem.Size = new UDim2(1, -28, 1, -102);
+	rolagem.Position = new UDim2(0, 14, 0, 92);
+	rolagem.BackgroundTransparency = 1;
+	rolagem.BorderSizePixel = 0;
+	rolagem.ScrollBarThickness = 6;
+	rolagem.AutomaticCanvasSize = Enum.AutomaticSize.Y;
+	rolagem.CanvasSize = new UDim2(0, 0, 0, 0);
+	rolagem.Parent = painel;
+	const layoutLista = new Instance("UIListLayout");
+	layoutLista.Padding = new UDim(0, 8);
+	layoutLista.SortOrder = Enum.SortOrder.LayoutOrder;
+	layoutLista.Parent = rolagem;
+
+	// ----- Tela de fim (opaca: esconde o mundo 3D atrás) -----
+	const telaFim = novoQuadro(gui, "Fim", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+	telaFim.ZIndex = 70;
 	telaFim.Visible = false;
 	const txtFimTitulo = novoTexto(telaFim, "Titulo", "", 48, COR_DESTAQUE, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 120));
 	const txtFimStats = novoTexto(telaFim, "Stats", "", 20, COR_TEXTO, new UDim2(1, 0, 0, 160), new UDim2(0, 0, 0, 210));
@@ -334,6 +397,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let dashCdT = 0;
 	let bannerT = 0;
 	let proxId = 1;
+	let painelAberto: "tarefas" | "mochila" | "equip" | undefined = undefined;
+	const mochila: ItemInfo[] = [];
+	let equipArma: ItemInfo | undefined = undefined;
+	let equipArmadura: ItemInfo | undefined = undefined;
+	let equipAcess: ItemInfo | undefined = undefined;
 
 	let framePlayer: Frame | undefined = undefined;
 	let olhoPlayer: Frame | undefined = undefined;
@@ -394,7 +462,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 
 	function tentarDash(): void {
-		if (estado !== "jogo" || pausado || dashCdT > 0) {
+		if (estado !== "jogo" || pausado || painelAberto !== undefined || dashCdT > 0) {
 			return;
 		}
 		dashT = 0.18;
@@ -580,6 +648,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			quests.push({ id: q.id, nome: q.nome, descricao: q.descricao, meta: q.meta, progresso: 0, completa: false, xp: q.xp });
 		}
 		atualizarQuestsUI();
+		// Inventário inicial + painel fechado
+		mochila.clear();
+		equipArma = ITENS_INICIAIS[0];
+		equipArmadura = ITENS_INICIAIS[1];
+		equipAcess = undefined;
+		painelAberto = undefined;
+		painel.Visible = false;
 
 		// Avatar + plaquinha de HUD sob o personagem (vida/XP/nível, pequena)
 		const p = novoQuadro(arena, "Player", new UDim2(0, 20, 0, 20), new UDim2(0, 0, 0, 0), c.cor, 0);
@@ -631,10 +706,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		print(`[PixelQuest] Fim de run: vitoria=${venceu} valor=${valor}.`);
 	}
 
-	for (let i = 0; i < botoesClasse.size(); i++) {
-		const idx = i;
-		botoesClasse[idx].Activated.Connect(() => comecarRun(idx));
-	}
+	btnJogar.Activated.Connect(() => comecarRun(0));
 	btnDeNovo.Activated.Connect(() => comecarRun(classeIdx));
 	btnMenu.Activated.Connect(() => {
 		limparEntidades();
@@ -718,6 +790,200 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	}
 
+	// ===== Mochila & equipamentos =====
+	function danoTotal(): number {
+		const c = CLASSES[classeIdx];
+		let d = c.dano;
+		if (equipArma !== undefined) {
+			d += equipArma.dano;
+		}
+		if (equipAcess !== undefined) {
+			d += equipAcess.dano;
+		}
+		return d;
+	}
+
+	function bonusTexto(it: ItemInfo): string {
+		const partes: string[] = [];
+		if (it.dano > 0) {
+			partes.push(`+${it.dano} dano`);
+		}
+		if (it.hp > 0) {
+			partes.push(`+${it.hp} HP`);
+		}
+		if (partes.size() === 0) {
+			return "sem bônus";
+		}
+		return partes.join(" ");
+	}
+
+	function temItem(id: string): boolean {
+		for (const it of mochila) {
+			if (it.id === id) {
+				return true;
+			}
+		}
+		return equipArma?.id === id || equipArmadura?.id === id || equipAcess?.id === id;
+	}
+
+	function darItem(info: ItemInfo): void {
+		if (temItem(info.id)) {
+			// Duplicata vira moedas na hora (sem entulhar a mochila)
+			moedas += info.preco;
+			floater(tX(px), tY(py) - 14, `+$${info.preco} (dup)`, COR_DESTAQUE);
+		} else {
+			mochila.push(info);
+			floater(tX(px), tY(py) - 14, `Novo: ${info.nome}!`, COR_VIDA);
+			mostrarBanner(`ITEM: ${info.nome}!`, 1.6);
+		}
+		if (painelAberto !== undefined) {
+			refreshPainel();
+		}
+	}
+
+	function ajustarHpBonus(antigo: number, novo: number): void {
+		hpMax += novo - antigo;
+		hp += novo - antigo;
+		if (hp > hpMax) {
+			hp = hpMax;
+		}
+		if (hp < 1) {
+			hp = 1;
+		}
+	}
+
+	function equipar(id: string): void {
+		for (let i = 0; i < mochila.size(); i++) {
+			if (mochila[i].id !== id) {
+				continue;
+			}
+			const it = mochila[i];
+			mochila[i] = mochila[mochila.size() - 1];
+			mochila.pop();
+			if (it.slot === "arma") {
+				if (equipArma !== undefined) {
+					mochila.push(equipArma);
+				}
+				equipArma = it;
+			} else if (it.slot === "armadura") {
+				if (equipArmadura !== undefined) {
+					mochila.push(equipArmadura);
+					ajustarHpBonus(equipArmadura.hp, 0);
+				}
+				equipArmadura = it;
+				ajustarHpBonus(0, it.hp);
+			} else {
+				if (equipAcess !== undefined) {
+					mochila.push(equipAcess);
+					ajustarHpBonus(equipAcess.hp, 0);
+				}
+				equipAcess = it;
+				ajustarHpBonus(0, it.hp);
+			}
+			print(`[PixelQuest] Equipado: ${it.nome}.`);
+			break;
+		}
+		refreshPainel();
+	}
+
+	function removerSlot(slot: SlotItem): void {
+		if (slot === "arma" && equipArma !== undefined) {
+			mochila.push(equipArma);
+			equipArma = undefined;
+		} else if (slot === "armadura" && equipArmadura !== undefined) {
+			ajustarHpBonus(equipArmadura.hp, 0);
+			mochila.push(equipArmadura);
+			equipArmadura = undefined;
+		} else if (slot === "acess" && equipAcess !== undefined) {
+			ajustarHpBonus(equipAcess.hp, 0);
+			mochila.push(equipAcess);
+			equipAcess = undefined;
+		}
+		refreshPainel();
+	}
+
+	function adicionarLinha(texto: string, comBotao: boolean, rotulo: string, aoClicar: () => void): void {
+		const linha = novoQuadro(rolagem, `L${proxId}`, new UDim2(1, -8, 0, 54), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+		proxId++;
+		const t = novoTexto(linha, "T", texto, 14, COR_TEXTO, new UDim2(1, -124, 1, -6), new UDim2(0, 8, 0, 3));
+		t.TextXAlignment = Enum.TextXAlignment.Left;
+		t.TextWrapped = true;
+		if (comBotao) {
+			const b = novoBotao(linha, "B", rotulo, new UDim2(0, 100, 0, 38), new UDim2(1, -108, 0, 8), COR_PAINEL, 14);
+			b.Activated.Connect(aoClicar);
+		}
+	}
+
+	function limparRolagem(): void {
+		for (const ch of rolagem.GetChildren()) {
+			if (ch.IsA("Frame")) {
+				ch.Destroy();
+			}
+		}
+	}
+
+	function refreshPainel(): void {
+		const aba = painelAberto;
+		if (aba === undefined) {
+			return;
+		}
+		limparRolagem();
+		if (aba === "tarefas") {
+			tituloPainel.Text = "TAREFAS / MISSÕES";
+			for (const q of quests) {
+				const marca = q.completa ? "[X]" : `[${q.progresso}/${q.meta}]`;
+				adicionarLinha(`${marca} ${q.nome}\n${q.descricao} | +${q.xp} XP`, false, "", () => {});
+			}
+		} else if (aba === "mochila") {
+			tituloPainel.Text = `MOCHILA (${mochila.size()}) — $ ${moedas}`;
+			if (mochila.size() === 0) {
+				adicionarLinha("Mochila vazia — derrote inimigos e complete quests!", false, "", () => {});
+			}
+			for (const it of mochila) {
+				const idItem = it.id;
+				adicionarLinha(`${it.nome} (${NOME_SLOT[it.slot]})\n${bonusTexto(it)} — ${it.descricao}`, true, "EQUIPAR", () => equipar(idItem));
+			}
+		} else {
+			tituloPainel.Text = `EQUIPADO — dano ${danoTotal()} | HP máx ${hpMax}`;
+			const slots: [SlotItem, ItemInfo | undefined][] = [
+				["arma", equipArma],
+				["armadura", equipArmadura],
+				["acess", equipAcess],
+			];
+			for (const [slot, eq] of slots) {
+				if (eq !== undefined) {
+					const s = slot;
+					adicionarLinha(`${NOME_SLOT[slot]}: ${eq.nome}\n${bonusTexto(eq)}`, true, "REMOVER", () => removerSlot(s));
+				} else {
+					adicionarLinha(`${NOME_SLOT[slot]}: — vazio —`, false, "", () => {});
+				}
+			}
+		}
+	}
+
+	function abrirPainel(aba: "tarefas" | "mochila" | "equip"): void {
+		painelAberto = aba;
+		painel.Visible = true;
+		refreshPainel();
+	}
+
+	function fecharPainel(): void {
+		painelAberto = undefined;
+		painel.Visible = false;
+	}
+
+	abaMissoes.Activated.Connect(() => abrirPainel("tarefas"));
+	abaMochila.Activated.Connect(() => abrirPainel("mochila"));
+	abaEquip.Activated.Connect(() => abrirPainel("equip"));
+	btnFecharPainel.Activated.Connect(() => fecharPainel());
+	btnOpcoes.Activated.Connect(() => {
+		if (painelAberto === undefined) {
+			abrirPainel("tarefas");
+		} else {
+			fecharPainel();
+		}
+	});
+
 	function checarQuest(tipo: "abates" | "moedas" | "boss"): void {
 		for (const q of quests) {
 			if (q.completa) {
@@ -738,6 +1004,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				q.completa = true;
 				questsCompletas++;
 				ganharXp(q.xp);
+				if (q.id === "limpeza") {
+					darItem(ANEL_VALOR);
+				}
 				mostrarBanner(`QUEST: ${q.nome}!`, 2);
 				print(`[PixelQuest] Quest completa: ${q.nome}.`);
 			}
@@ -760,6 +1029,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		if (math.random() < 0.12) {
 			coletaveis.push(criarColetavel(e.x, e.y, 0, 0, "coracao"));
+		}
+		// Loot de equipamento (comum; boss garante o set rúnico)
+		if (e.eBoss) {
+			for (const item of LOOT_BOSS) {
+				darItem(item);
+			}
+		} else if (math.random() < 0.06 && LOOT_COMUM.size() > 0) {
+			darItem(LOOT_COMUM[math.random(0, LOOT_COMUM.size() - 1)]);
 		}
 		checarQuest("abates");
 		if (e.eBoss) {
@@ -796,10 +1073,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	function atirarAmiga(dx: number, dy: number): void {
 		const c = CLASSES[classeIdx];
 		const t = c.tamTiro;
+		const dano = danoTotal();
 		const f = novoQuadro(arena, `B${proxId}`, new UDim2(0, t, 0, t), new UDim2(0, 0, 0, 0), c.cor, 0);
 		f.ZIndex = 7;
 		proxId++;
-		balas.push({ x: px, y: py, vx: dx * c.velTiro, vy: dy * c.velTiro, vida: 1.6, dano: c.dano, amiga: true, tam: t, frame: f });
+		balas.push({ x: px, y: py, vx: dx * c.velTiro, vy: dy * c.velTiro, vida: 1.6, dano: dano, amiga: true, tam: t, frame: f });
 	}
 
 	function atirarInimiga(x: number, y: number, dx: number, dy: number, vel: number, dano: number): void {
@@ -830,7 +1108,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	// ===== Loop principal =====
 	RunService.Heartbeat.Connect((dt) => {
-		if (estado !== "jogo" || pausado) {
+		if (estado !== "jogo" || pausado || painelAberto !== undefined) {
 			return;
 		}
 		if (dt > 0.1) {

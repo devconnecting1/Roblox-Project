@@ -40,10 +40,15 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **Mundo aberto em tela cheia:** ilha procedural 2400×1536 (oceano, praia, grama, palmeiras, rochas com colisão); câmera segue o jogador com culling de tiles + **minimapa** com pontos de inimigos/boss
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
 - **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado
-- **Classes:** Guerreiro (HP 46, dano alto), Mago (HP 36, tiro rápido), Ladino (HP 40, veloz)
+- **1 classe:** Aventureiro (equilibrado); novas classes entram quando o balanceamento pedir
+- **Painel ≡ OPÇÕES (diálogo horizontal):** abas **Tarefas** (missões + recompensas), **Mochila** (loot com EQUIPAR) e **Equipamentos** (arma/armadura/acessório equipados + REMOVER); abre pausa o jogo
+- **Loot:** inimigos derrubam Espada de Ferro/Armadura de Couro (duplicata vira moedas); quest dá Anel de Valor; boss garante Espada Rúnica + Cota de Malha
+- **Fontes:** `FontFace` Gotham em toda UI + contorno em todo texto; p/ Geist similar, suba o TTF (Creator Dashboard → Fonts) e ponha o ID em `FONTE_ID` (`src/client/jogo.ts`)
+- **ZIndex à prova de regressão:** `ZIndexBehavior=Sibling` + camadas (mapa 1–20, HUD 50+, painel 65, telas 70) — HUD nunca mais fica atrás de tile
 - **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (atira!) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell)
-- **Controles (PC):** WASD/setas movem em todas as direções, tiro automático no inimigo mais próximo, SHIFT/L = dash (invencibilidade breve), P pausa
+- **Controles (PC):** WASD/setas movem em todas as direções, tiro automático no inimigo mais próximo, SHIFT/L = dash (invencibilidade breve), P pausa, ≡ OPÇÕES = tarefas/mochila/equipamentos (pausa o jogo)
 - **HUD do jogador sob o personagem:** plaquinha pequena com barra de vida + barra de XP + nível (topo só tem moedas, onda, quests e minimapa)
+- **Visibilidade vs. botões nativos:** HUD do topo começa em x=175/y=36 (longe do ☰/chat e do placar), abaixo da topbar nativa
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
 - **Progressão:** XP → nível (+4 HP máx, cura total); moedas com imã; corações curam; morte/vitória salva via Net nos leaderstats (Moedas, Nivel, Valor)
 
