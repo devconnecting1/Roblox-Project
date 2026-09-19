@@ -63,7 +63,7 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **Chat com balões 2D:** janela/histórico nativos (TextChatService); balão sobre o sprite por 5s só no canal geral — privado não gera balão; painel de quests foi para a direita para não cobrir o chat
 - **Otimizado:** snapshots 20Hz, sem simulação sem jogadores, teto de balas, explorado recalculado só ao trocar de tile, HUD/placa só reescrevem no que muda, labels PQ_* no MicroProfiler
 - **Sem ondas:** inimigos nascem nos caminhos de cada área liberada; progressão = limpar → avançar
-- **Seletor em cards verticais (estilo 9Kings):** fundo preto, 5 cartas 150×220 (livre clara com nome, trancadas escuras com cadeado desenhado + Nv); sem tags desnecessárias; chrome do HUD 100% neutro (títulos, botões, painéis, bordas e moedas em branco/cinza — cor só onde é semântica: vida, XP, dano sofrido, boss)
+- **Seletor em carrossel (estilo 9Kings):** fundo preto, 5 cartas verticais sobrepostas (centro maior na frente); clique gira a carta ao centro, clique de novo confirma (cadeado + Nv nas trancadas); chrome do HUD 100% neutro (títulos, botões, painéis, bordas e moedas em branco/cinza — cor só onde é semântica: vida, XP, dano sofrido, boss)
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
 - **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado
 - **1 classe:** Aventureiro (equilibrado); novas classes entram quando o balanceamento pedir

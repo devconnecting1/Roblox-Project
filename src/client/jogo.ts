@@ -91,26 +91,26 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const telaMapas = novoQuadro(gui, "Mapas", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	telaMapas.ZIndex = 70;
 	telaMapas.Visible = false;
-	novoTexto(telaMapas, "Titulo", "SELECIONE O MAPA", 40, COR_TEXTO, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 60));
+	novoTexto(telaMapas, "Titulo", "SELECIONE O MAPA", 40, COR_TEXTO, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 24));
 	novoTexto(
 		telaMapas,
 		"Sub",
-		"Suba o Nível da conta completando runs para desbloquear novos mapas.",
-		16,
+		"Clique para escolher • Nv da conta desbloqueia mapas",
+		14,
 		Color3.fromRGB(160, 175, 195),
-		new UDim2(1, 0, 0, 26),
-		new UDim2(0, 0, 0, 135),
+		new UDim2(1, 0, 0, 22),
+		new UDim2(0, 0, 0, 100),
 	);
 	const ajudaMapas = novoTexto(
 		telaMapas,
 		"Ajuda",
-		"WASD/setas movem | Mouse mira | BOTÃO ESQ atira | E: auto-tiro | BOTÃO DIR: dash | P: pausa | Fique 3s no selo do lobby",
+		"",
 		12,
 		Color3.fromRGB(160, 175, 195),
-		new UDim2(1, -40, 0, 40),
-		new UDim2(0, 20, 0, 470),
+		new UDim2(0, 0, 0, 0),
+		new UDim2(0, 0, 0, 0),
 	);
-	ajudaMapas.TextWrapped = true;
+	ajudaMapas.Visible = false;
 	interface CardMapa {
 		btn: TextButton;
 		head: TextLabel;
@@ -130,8 +130,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			COR_PAINEL,
 			15,
 		);
-		const head = novoTexto(b, `H${i}`, "", 16, COR_TEXTO, new UDim2(1, 0, 0, 26), new UDim2(0, 0, 0, 12));
-		const mid = novoTexto(b, `M${i}`, "", 13, COR_TEXTO, new UDim2(1, -20, 0, 60), new UDim2(0, 10, 0, 66));
+		const head = novoTexto(b, `H${i}`, "", 16, COR_TEXTO, new UDim2(1, 0, 0, 0.12), new UDim2(0, 0, 0, 0.05));
+		const mid = novoTexto(b, `M${i}`, "", 13, COR_TEXTO, new UDim2(1, 0, 0, 0.3), new UDim2(0, 0, 0, 0.32));
 		mid.TextWrapped = true;
 		const foot = novoTexto(
 			b,
@@ -139,19 +139,19 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			"",
 			12,
 			Color3.fromRGB(150, 160, 175),
-			new UDim2(1, -20, 0, 20),
-			new UDim2(0, 10, 0, 188),
+			new UDim2(1, 0, 0, 0.1),
+			new UDim2(0, 0, 0, 0.85),
 		);
 		const lockCorpo = novoQuadro(
 			b,
 			`LC${i}`,
 			new UDim2(0, 30, 0, 24),
-			new UDim2(0.5, -15, 0, 106),
+			new UDim2(0.5, -15, 0.5, -2),
 			Color3.fromRGB(20, 24, 32),
 			0,
 		);
 		borda(lockCorpo, COR_TEXTO, 2);
-		const lockArco = novoQuadro(b, `LA${i}`, new UDim2(0, 20, 0, 16), new UDim2(0.5, -10, 0, 94), COR_TEXTO, 1);
+		const lockArco = novoQuadro(b, `LA${i}`, new UDim2(0, 20, 0, 16), new UDim2(0.5, -10, 0.5, -14), COR_TEXTO, 1);
 		const uic = new Instance("UICorner");
 		uic.CornerRadius = new UDim(0.5, 0);
 		uic.Parent = lockArco;
@@ -160,12 +160,66 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		lockArco.Visible = false;
 		cardsMapa.push({ btn: b, head: head, mid: mid, foot: foot, lockCorpo: lockCorpo, lockArco: lockArco });
 	}
+
+	function alvoCarta(off: number): { w: number; h: number; x: number; z: number } {
+		const a = math.abs(off);
+		if (a === 0) {
+			return { w: 170, h: 250, x: -85, z: 14 };
+		} else if (a === 1) {
+			return { w: 140, h: 205, x: off * 108 - 70, z: 12 };
+		}
+		return { w: 115, h: 175, x: off * 100 - 57.5, z: 10 };
+	}
+
+	function posicionarCards(animar: boolean): void {
+		tweenSel++;
+		const vez = tweenSel;
+		for (let i = 0; i < cardsMapa.size(); i++) {
+			const c = cardsMapa[i];
+			const z = alvoCarta(i - slotSel).z + 1;
+			c.btn.ZIndex = z - 1;
+			c.head.ZIndex = z;
+			c.mid.ZIndex = z;
+			c.foot.ZIndex = z;
+			c.lockCorpo.ZIndex = z;
+			c.lockArco.ZIndex = z;
+		}
+		const de: { x: number; w: number; h: number }[] = [];
+		for (const c of cardsMapa) {
+			de.push({ x: c.btn.Position.X.Offset, w: c.btn.Size.X.Offset, h: c.btn.Size.Y.Offset });
+		}
+		const aplicar = (t: number) => {
+			for (let i = 0; i < cardsMapa.size(); i++) {
+				const c = cardsMapa[i];
+				const a = alvoCarta(i - slotSel);
+				const d = de[i];
+				const nx = d.x + (a.x - d.x) * t;
+				const nw = d.w + (a.w - d.w) * t;
+				const nh = d.h + (a.h - d.h) * t;
+				c.btn.Position = new UDim2(0.5, nx, 0.5, -nh / 2);
+				c.btn.Size = new UDim2(0, nw, 0, nh);
+			}
+		};
+		if (!animar) {
+			aplicar(1);
+			return;
+		}
+		task.spawn(() => {
+			for (let s = 1; s <= 11; s++) {
+				if (vez !== tweenSel) {
+					return;
+				}
+				aplicar(s / 11);
+				task.wait(0.02);
+			}
+		});
+	}
 	const btnVoltarMapas = novoBotao(
 		telaMapas,
 		"Voltar",
 		"← VOLTAR",
 		new UDim2(0, 220, 0, 54),
-		new UDim2(0.5, -110, 0.5, 126),
+		new UDim2(0.5, -110, 0.62, 0),
 		COR_PAINEL,
 		18,
 	);
@@ -176,7 +230,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		16,
 		COR_TEXTO,
 		new UDim2(0, 520, 0, 26),
-		new UDim2(0.5, -260, 0.5, 190),
+		new UDim2(0.5, -260, 0.72, 0),
 	);
 
 	// ----- Tela do jogo (tela cheia) -----
@@ -395,6 +449,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	// ===== Estado de render (espelho do servidor) =====
 	let estado: "mapas" | "jogo" | "fim" = "jogo";
 	let mapaIdx = 0;
+	let slotSel = 0;
+	let tweenSel = 0;
 	let grade: string[] = [];
 	let explorado: boolean[] = [];
 	let camX = 0;
@@ -782,6 +838,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaFim.Visible = false;
 		telaMapas.Visible = true;
 		estado = "mapas";
+		posicionarCards(false);
 	}
 
 	function entrarNoMapa(idx: number): void {
@@ -862,13 +919,18 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	for (let i = 0; i < cardsMapa.size(); i++) {
 		const idx = i;
 		cardsMapa[idx].btn.Activated.Connect(() => {
-			if (idx === 0) {
-				entrarNoMapa(idx);
+			if (idx === slotSel) {
+				if (idx === 0) {
+					entrarNoMapa(idx);
+				} else {
+					avisoMapas.Text = `MAPA ${idx + 1} bloqueado: Nv ${MAPAS[idx].reqNivel} (conta) — em breve!`;
+					task.delay(2.5, () => {
+						avisoMapas.Text = "";
+					});
+				}
 			} else {
-				avisoMapas.Text = `MAPA ${idx + 1} bloqueado: Nv ${MAPAS[idx].reqNivel} (conta) — em breve!`;
-				task.delay(2.5, () => {
-					avisoMapas.Text = "";
-				});
+				slotSel = idx;
+				posicionarCards(true);
 			}
 		});
 	}
