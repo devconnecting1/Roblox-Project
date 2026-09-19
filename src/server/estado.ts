@@ -144,7 +144,7 @@ export function dist2(x1: number, y1: number, x2: number, y2: number): number {
 }
 
 // ---------- Leaderstats ----------
-export function garantirLeaderstats(player: Player): void {
+export function garantirLeaderstats(player: Player, moedas = 0, nivel = 1, valor = 0): void {
 	let stats = player.FindFirstChild("leaderstats");
 	if (stats === undefined || !stats.IsA("Folder")) {
 		const pasta = new Instance("Folder");
@@ -158,7 +158,7 @@ export function garantirLeaderstats(player: Player): void {
 		if (achou === undefined || !achou.IsA("IntValue")) {
 			const v = new Instance("IntValue");
 			v.Name = nome;
-			v.Value = nome === "Nivel" ? 1 : 0;
+			v.Value = nome === "Nivel" ? nivel : nome === "Moedas" ? moedas : valor;
 			v.Parent = pasta;
 		}
 	}

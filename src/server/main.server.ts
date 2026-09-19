@@ -1,7 +1,8 @@
 import { Players, RunService } from "@rbxts/services";
 import { eEntrada, eIdTexto, eMapaIdx, Remotes } from "shared/pixelquest/Rede";
 import { alternarPausa, aplicarEntrada, equiparItem, removerJogador, removerSlot } from "./jogadores";
-import { garantirLeaderstats, mundo, nivelConta } from "./estado";
+import { mundo, nivelConta } from "./estado";
+import { carregarDados, salvarDados } from "./save";
 import { atualizar, escolherMapa } from "./simulacao";
 
 // Jogo 100% interface 2D: o avatar 3D nunca nasce.
@@ -10,11 +11,14 @@ Players.CharacterAutoLoads = false;
 // TextChatService nas propriedades do place). A janela/histórico é nativa; os
 // balões 2D sobre os sprites são desenhados pelo cliente.
 
-Players.PlayerAdded.Connect((player) => garantirLeaderstats(player));
+Players.PlayerAdded.Connect((player) => carregarDados(player));
 for (const player of Players.GetPlayers()) {
-	garantirLeaderstats(player);
+	carregarDados(player);
 }
-Players.PlayerRemoving.Connect((player) => removerJogador(player));
+Players.PlayerRemoving.Connect((player) => {
+	salvarDados(player);
+	removerJogador(player);
+});
 
 // Cliente → servidor (tudo validado; estado mora no servidor)
 Remotes.Server.Get("Entrada").Connect((player, entrada) => {

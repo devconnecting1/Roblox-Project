@@ -76,6 +76,8 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **Visibilidade vs. botões nativos:** HUD do topo começa em x=175/y=36 (longe do ☰/chat e do placar), abaixo da topbar nativa
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
 - **Progressão:** XP → nível (+4 HP máx, cura total); moedas com imã; corações curam; morte/vitória salva via Net nos leaderstats (Moedas, Nivel, Valor)
+- **Save em DataStore (`server/save.ts`):** conta persistente (`PixelQuestConta/conta_<UserId>`, v1) — carrega ao entrar, salva ao sair + autosave 3min + BindToClose; sair no meio da run banca as moedas e guarda o maior nível; sem acesso à API (Studio) usa padrões locais sem quebrar
+- **UI por componentes (nosso "shadcn"):** shadcn React/DOM não roda no Roblox — o equivalente é `client/ui.ts` (Button/Card/Badge/Tabs/Progress/Text com variantes via parâmetros) + `efeitos.ts` + `chat.ts`, todos puros e sem estado de jogo
 
 ## Rodar local
 

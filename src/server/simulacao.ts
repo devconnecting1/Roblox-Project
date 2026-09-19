@@ -14,6 +14,7 @@ import { MAPAS } from "shared/pixelquest/Dados";
 import { acharChaoPerto, gerarMundo, gradeStrings } from "./mundo";
 import { garantirLeaderstats, mundo, nivelConta } from "./estado";
 import { atualizarCots, atualizarJogadores, novoJogador } from "./jogadores";
+import { titulosSalvos } from "./save";
 import { atualizarInimigos, spawnPack } from "./inimigos";
 import { atualizarBalas } from "./projeteis";
 import { enviar, enviarSnapshots } from "./foto";
@@ -43,6 +44,9 @@ function spawnJogadorEm(player: Player, nasc: [number, number]): void {
 	garantirLeaderstats(player);
 	const [nx, ny] = acharChaoPerto(nasc[0], nasc[1], 12);
 	const js = novoJogador(player, [nx, ny]);
+	const [tit, eq] = titulosSalvos(player);
+	js.titulos = [...tit];
+	js.tituloEq = eq;
 	mundo.jogadores.set(player, js);
 	enviar(player, { tipo: "mapa", grade: gradeStrings(), seed: mundo.seed });
 	enviar(player, { tipo: "banner", texto: "MASMORRA INICIAL — explore as salas!", duracao: 2.5 });
