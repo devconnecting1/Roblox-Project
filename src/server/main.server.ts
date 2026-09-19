@@ -25,6 +25,11 @@ Players.PlayerRemoving.Connect((player) => removerJogador(player));
 // Cliente → servidor (tudo validado; estado mora no servidor)
 Remotes.Server.Get("Entrada").Connect((player, entrada) => {
 	if (!eEntrada(entrada)) {
+		warn(`[PixelQuest] Entrada inválida de ${player.Name} (ignorada).`);
+		return;
+	}
+	if (!mundo.jogadores.has(player)) {
+		warn(`[PixelQuest] Entrada de ${player.Name} sem run ativa (ignorada).`);
 		return;
 	}
 	aplicarEntrada(player, entrada);

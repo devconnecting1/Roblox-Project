@@ -63,16 +63,18 @@ for (const ch of ["W", "~", ".", ",", "G", "T", "*", "R", "D"]) {
 	COR_ESCURA[ch] = new Color3(cor.R * 0.32, cor.G * 0.32, cor.B * 0.32);
 }
 
-// ID numérico por char p/ chave do cache (charCodeAt não existe no roblox-ts)
-const ID_CH: { [chave: string]: number } = { W: 0, "~": 1, ".": 2, ",": 3, G: 4, T: 5, "*": 6, R: 7, D: 8 };
-
 // ---------- Fonte ----------
 const FONTE_ID = 0;
 function fonteJogo(peso: Enum.FontWeight): Font {
 	if (FONTE_ID > 0) {
 		return Font.fromId(FONTE_ID, peso);
 	}
-	return Font.fromName("Gotham", peso);
+	// fromEnum usa a fonte embutida (sem baixar families JSON — evita o
+	// "Gotham.json failed to load" no Studio)
+	if (peso === Enum.FontWeight.ExtraBold) {
+		return Font.fromEnum(Enum.Font.GothamBlack);
+	}
+	return Font.fromEnum(Enum.Font.GothamBold);
 }
 function contornoTexto(inst: TextLabel | TextButton): void {
 	const s = new Instance("UIStroke");
@@ -274,6 +276,10 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const rotuloPausa = novoTexto(telaJogo, "Pausado", "PAUSADO", 22, COR_TEXTO, new UDim2(0, 200, 0, 30), new UDim2(0.5, -100, 0, TOPO_Y + 46));
 	rotuloPausa.ZIndex = 60;
 	rotuloPausa.Visible = false;
+	// Diagnóstico temporário: input enviado | posição do servidor | idade da foto
+	const rotuloDebug = novoTexto(telaJogo, "Debug", "", 13, COR_TEXTO, new UDim2(0, 420, 0, 20), new UDim2(0, 10, 1, -24));
+	rotuloDebug.ZIndex = 60;
+	rotuloDebug.TextXAlignment = Enum.TextXAlignment.Left;
 	const barraBossFundo = novoQuadro(telaJogo, "BossFundo", new UDim2(0, 400, 0, 14), new UDim2(0.5, -200, 0, TOPO_Y + 78), Color3.fromRGB(60, 10, 40), 0);
 	barraBossFundo.ZIndex = 60;
 	barraBossFundo.Visible = false;
@@ -331,6 +337,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let primeiraFoto = false;
 	let bannerT = 0;
 	let tempo = 0;
+	let ultimoFotoT = -99;
 	let proxIdLocal = 1;
 	let painelAberto: "tarefas" | "mochila" | "equip" | undefined = undefined;
 	let ultimaMochila = "";
@@ -517,11 +524,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 	}
 
-	// Cache por tile DO MUNDO (não do slot da tela): só reescreve o que mudou
-	// de aparência (char + estado de névoa). Correto sob scroll, ao contrário
-	// de cache por slot — e o mapa continua sendo só dado (60 strings).
-	let cacheMundo: number[] = [];
-
 	function desenharTiles(): void {
 		const camada = camadaTiles;
 		if (camada === undefined || tilesCols === 0 || grade.size() === 0) {
@@ -552,15 +554,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const perto = cx * cx + cy * cy < VISAO * VISAO;
 			const vis = perto && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
 			const exp = dentro && explorado[ty * MUNDO_TX + tx];
-			const est = vis ? 2 : exp ? 1 : 0;
-			const chave = (ID_CH[ch] ?? 9) * 4 + est;
-			const idx = dentro ? ty * MUNDO_TX + tx : -1;
-			if (idx >= 0 && cacheMundo[idx] === chave) {
-				continue; // aparência idêntica: pula a escrita
-			}
-			if (idx >= 0) {
-				cacheMundo[idx] = chave;
-			}
 			if (!vis && !exp) {
 				t.frame.Visible = false; // inexplorado: some (fundo preto)
 				continue;
@@ -695,6 +688,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		ultimaFoto = foto;
 		px = foto.px;
 		py = foto.py;
+		ultimoFotoT = tempo;
 		if (!primeiraFoto) {
 			primeiraFoto = true;
 			banner.Visible = false;
@@ -749,7 +743,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			nevoaTileY = -999;
 			expTX = -999;
 			expTY = -999;
-			cacheMundo = []; // grade nova: invalida o cache de aparência
 		} else if (ev.tipo === "porta") {
 			if (ev.ty >= 0 && ev.ty < grade.size()) {
 				const linha = grade[ev.ty];
@@ -1198,6 +1191,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			barraBossFundo.Visible = false;
 			txtBoss.Visible = false;
 		}
+		const idadeFoto = tempo - ultimoFotoT;
+		rotuloDebug.Text = `IN ${string.format("%.1f", envDx)},${string.format("%.1f", envDy)} | SV ${math.floor(foto.px)},${math.floor(foto.py)} | F ${string.format("%.1f", idadeFoto)}s`;
+		rotuloDebug.TextColor3 = idadeFoto > 2 ? COR_PERIGO : COR_TEXTO;
 	});
 
 	print("[PixelQuest] Cliente renderer pronto (tudo simulado no servidor).");
