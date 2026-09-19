@@ -504,6 +504,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let plVida = -1;
 	let plXp = -1;
 	let plNv = -1;
+	let plRX = 0;
+	let plRY = 0;
 	let dbgT = 0;
 	let proxIdLocal = 1;
 	let painelAberto: "tarefas" | "mochila" | "equip" | undefined = undefined;
@@ -1081,6 +1083,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		ultimaFoto = undefined;
 		primeiraFoto = false;
 		camPronta = false;
+		plRX = 0;
+		plRY = 0;
 	}
 
 	// Pools de balas/coletáveis (reuso por índice)
@@ -1303,8 +1307,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			camX = foto.px - vistaL / 2;
 			camY = foto.py - vistaA / 2;
 		} else {
-			const margemX = vistaL * 0.18;
-			const margemY = vistaA * 0.18;
+			const margemX = vistaL * 0.3;
+			const margemCima = vistaA * 0.3 + 80; // folga do HUD do topo + placa do jogador
+			const margemBaixo = vistaA * 0.3 + 24; // folga da linha de debug
 			let alvoX = camX;
 			let alvoY = camY;
 			const sx = foto.px - camX;
@@ -1314,10 +1319,10 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			} else if (sx > vistaL - margemX) {
 				alvoX = foto.px - (vistaL - margemX);
 			}
-			if (sy < margemY) {
-				alvoY = foto.py - margemY;
-			} else if (sy > vistaA - margemY) {
-				alvoY = foto.py - (vistaA - margemY);
+			if (sy < margemCima) {
+				alvoY = foto.py - margemCima;
+			} else if (sy > vistaA - margemBaixo) {
+				alvoY = foto.py - (vistaA - margemBaixo);
 			}
 			const k = 1 - math.exp(-8 * dt);
 			camX += (alvoX - camX) * k;
@@ -1333,8 +1338,18 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		// Jogador local
 		garantirPlayer();
 		if (framePlayer !== undefined) {
-			const sx = tX(foto.px) - 10;
-			const sy = tY(foto.py) - 10;
+			// Sprite suavizado (interpola entre snapshots de 20Hz); a câmera e
+			// o fog continuam na posição real do servidor (sem lag de sim)
+			if (plRX === 0 && plRY === 0) {
+				plRX = foto.px;
+				plRY = foto.py;
+			} else {
+				const kp = 1 - math.exp(-20 * dt);
+				plRX += (foto.px - plRX) * kp;
+				plRY += (foto.py - plRY) * kp;
+			}
+			const sx = tX(plRX) - 10;
+			const sy = tY(plRY) - 10;
 			framePlayer.Position = new UDim2(0, sx, 0, sy);
 			if (placaVida !== undefined) {
 				const fVida = foto.hp / foto.hpMax;

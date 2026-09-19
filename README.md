@@ -48,7 +48,7 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **IA com sentidos:** inimigos só enxergam com linha de visão (paredes bloqueiam, alcance 420px), guardam a última posição vista, vasculham e desistem; quem avista **alerta a equipe** próxima para caçar junto; patrulha com coleira na âncora; tiros e rajadas só com visão
 - **Fog of War com linha de visão (simétrico):** parede bloqueia a visão do jogador E dos inimigos; o fog é o limite de visão dos dois lados; explorado fica escurecido, inexplorado some (fundo preto); balas morrem na parede
 - **Tiles chapados + cache por tile do mundo:** paredes cinza sem detalhe, inexplorado invisível; o mapa é só dado (60 strings) e a tela é uma janela deslizante — o cache (char + estado de névoa por tile) pula ~90% das escritas no scroll
-- **Câmera com dead zone:** o jogador se move livre no centro da tela; a câmera só acompanha (suavizada) ao encostar nas margens (18%), sem travas de borda (no limite aparece Rocha)
+- **Câmera com dead zone:** o jogador se move livre no centro da tela (zona 40% + folga do HUD/placa/debug); a câmera só acompanha (suavizada) ao encostar nas margens, sem travas de borda (no limite aparece Rocha); sprite do jogador interpolado entre snapshots (fluido a 20Hz)
 - **Otimizado:** snapshots 20Hz, sem simulação sem jogadores, teto de balas, explorado recalculado só ao trocar de tile, HUD/placa só reescrevem no que muda, labels PQ_* no MicroProfiler
 - **Sem ondas:** inimigos nascem nos caminhos de cada área liberada; progressão = limpar → avançar
 - **Seletor de mapas (5 slots):** Mapa 1 liberado para todos; Mapas 2–5 mostram `Nv 10/20/30/40 • EM BREVE` (desbloqueio pelo Nível da conta nos leaderstats)
