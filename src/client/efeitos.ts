@@ -5,10 +5,10 @@
  * vem do servidor; aqui só a celebração, dirigida pelo loop de render.
  */
 import { novoQuadro, novoTexto } from "./ui";
-import { TILE } from "shared/pixelquest/Dados";
+import { COR_TILE, TILE } from "shared/pixelquest/Dados";
 
-// Quadradinho do level-up: escuro como a parede de onde saiu
-const COR_NIVEL = Color3.fromRGB(38, 42, 54);
+// Quadradinho do level-up: mesma cor de fundo das paredes de onde saiu
+const COR_NIVEL = COR_TILE["R"];
 
 interface Flutuante {
 	label: TextLabel;
@@ -43,7 +43,7 @@ export interface FxHandle {
 	limpar: () => void;
 }
 
-export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
+export function criarEfeitos(arena: Frame, telaJogo: Frame, aoFlash: () => void): FxHandle {
 	const flutuantes: Flutuante[] = [];
 	// Level-up: anel que voa ao centro + brilho + flash + pisca
 	const partsNivel: ParticulaNivel[] = [];
@@ -112,10 +112,10 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 			f.ZIndex = 19;
 			f.Visible = false;
 			const m = muros[(k * 7) % muros.size()];
-			partsNivel.push({ frame: f, x0: m[0], y0: m[1], atraso: k * 0.045, t: 0 });
+			partsNivel.push({ frame: f, x0: m[0], y0: m[1], atraso: k * 0.06, t: 0 });
 		}
 		alvoBrilho = brilho;
-		brilhoT = 2.8;
+		brilhoT = 3.6;
 		fxAtivo = true;
 		fxFlash = false;
 	}
@@ -150,7 +150,7 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 				if (pt.atraso > 0) {
 					pt.atraso -= dt;
 				} else {
-					pt.t += dt / 1.3;
+					pt.t += dt / 1.8;
 					if (pt.t >= 1) {
 						pt.frame.Destroy();
 						partsNivel[i] = partsNivel[partsNivel.size() - 1];
@@ -171,6 +171,7 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 			}
 			if (partsNivel.size() === 0 && !fxFlash) {
 				fxFlash = true;
+				aoFlash(); // último quadradinho chegou: título + flash + pisca
 				flashT = 0.28;
 				piscaT = 0.36;
 				if (flashBg === undefined) {

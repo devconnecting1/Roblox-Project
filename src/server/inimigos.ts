@@ -46,6 +46,7 @@ function nascerInimigo(info: InimigoInfo, boss: boolean, area: number, x: number
 		dirWY: math.sin(a),
 		ancoraX: x,
 		ancoraY: y,
+		nv: area + 1,
 	});
 	mundo.vivosPorArea[area]++;
 }
@@ -265,16 +266,21 @@ export function atualizarInimigos(dt: number): void {
 						});
 					}
 				} else {
-					empurrarBala({
-						x: e.x,
-						y: e.y,
-						vx: (tdx / td) * e.info.velBala,
-						vy: (tdy / td) * e.info.velBala,
-						vida: 3.5,
-						dano: e.danoBala,
-						amiga: false,
-						tam: 9,
-					});
+					// Leque: quantidade varia por tipo (Água-Viva espalha 3)
+					const n = e.info.tiros >= 1 ? e.info.tiros : 1;
+					for (let k = 0; k < n; k++) {
+						const base = math.atan2(tdy, tdx) + (k - (n - 1) / 2) * 0.22;
+						empurrarBala({
+							x: e.x,
+							y: e.y,
+							vx: math.cos(base) * e.info.velBala,
+							vy: math.sin(base) * e.info.velBala,
+							vida: 3.5,
+							dano: e.danoBala,
+							amiga: false,
+							tam: 9,
+						});
+					}
 				}
 				e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 			}

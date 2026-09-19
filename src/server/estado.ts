@@ -23,6 +23,7 @@ export interface InimigoS {
 	danoBala: number;
 	tiroT: number;
 	rajadaT: number;
+	nv: number; // nível = área + 1 (exibido abaixo do inimigo)
 	// Sentidos: visão com paredes, memória e caça em equipe
 	estado: EstadoInimigo;
 	alvo: JogadorS | undefined;
@@ -90,6 +91,12 @@ export interface JogadorS {
 	dashCdT: number;
 	dirX: number;
 	dirY: number;
+	ax: number; // mira do mouse (unitário)
+	ay: number;
+	fogo: boolean; // atirando (mouse segurado)
+	auto: boolean; // tiro automático (tecla E)
+	titulos: string[]; // títulos desbloqueados (ids)
+	tituloEq: string | undefined; // título equipado
 	morto: boolean;
 	pausado: boolean; // pausa individual (multiplayer: um pausa sem congelar os outros)
 }

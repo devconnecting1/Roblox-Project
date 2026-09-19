@@ -9,7 +9,7 @@
  *
  * PC only, tela cheia, câmera dinâmica livre, Fog of War (sem minimapa).
  */
-import { Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
+import { GuiService, Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
 import {
 	CLASSES,
 	COR_TILE,
@@ -21,6 +21,7 @@ import {
 	NOME_SLOT,
 	QUESTS,
 	TILE,
+	TITULOS,
 	VISAO,
 	Foto,
 } from "shared/pixelquest/Dados";
@@ -125,7 +126,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const ajuda = novoTexto(
 		telaMenu,
 		"Ajuda",
-		"PC: WASD/setas para mover em todas as direções | Tiro automático no inimigo mais próximo\nSHIFT/L: dash com invencibilidade | P: pausar | ≡ OPÇÕES: tarefas, mochila e equipamentos | Explore as 5 áreas!",
+		"PC: WASD/setas movem | Mouse mira | BOTÃO ESQ segura p/ atirar | E: tiro automático ON/OFF\nSHIFT/L: dash com invencibilidade | P: pausar | ≡ OPÇÕES: tarefas, mochila, equip e títulos | Explore as 5 áreas!",
 		15,
 		Color3.fromRGB(160, 175, 195),
 		new UDim2(1, -40, 0, 60),
@@ -303,28 +304,37 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		painel,
 		"AbaMissoes",
 		"TAREFAS",
-		new UDim2(0, 150, 0, 34),
+		new UDim2(0, 118, 0, 34),
 		new UDim2(0, 14, 0, 48),
 		COR_FUNDO,
-		15,
+		14,
 	);
 	const abaMochila = novoBotao(
 		painel,
 		"AbaMochila",
 		"MOCHILA",
-		new UDim2(0, 150, 0, 34),
-		new UDim2(0, 172, 0, 48),
+		new UDim2(0, 118, 0, 34),
+		new UDim2(0, 140, 0, 48),
 		COR_FUNDO,
-		15,
+		14,
 	);
 	const abaEquip = novoBotao(
 		painel,
 		"AbaEquip",
 		"EQUIP.",
-		new UDim2(0, 150, 0, 34),
-		new UDim2(0, 330, 0, 48),
+		new UDim2(0, 118, 0, 34),
+		new UDim2(0, 266, 0, 48),
 		COR_FUNDO,
-		15,
+		14,
+	);
+	const abaTitulos = novoBotao(
+		painel,
+		"AbaTitulos",
+		"TÍTULOS",
+		new UDim2(0, 118, 0, 34),
+		new UDim2(0, 392, 0, 48),
+		COR_FUNDO,
+		14,
 	);
 	const btnFecharPainel = novoBotao(
 		painel,
@@ -401,6 +411,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let tempo = 0;
 	let ultimoFotoT = -99;
 	let semente = 0;
+	let nivelPendente = 0;
 	let hudMoedas = -1;
 	let hudOnda = "";
 	let hudPausa = false;
@@ -412,7 +423,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let plRY = 0;
 	let dbgT = 0;
 	let proxIdLocal = 1;
-	let painelAberto: "tarefas" | "mochila" | "equip" | undefined = undefined;
+	let painelAberto: "tarefas" | "mochila" | "equip" | "titulos" | undefined = undefined;
 	let ultimaMochila = "";
 	let ultimoNv = 1;
 	let ultimasMoedas = 0;
@@ -434,6 +445,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let placaVida: Frame | undefined = undefined;
 	let placaXp: Frame | undefined = undefined;
 	let placaNv: TextLabel | undefined = undefined;
+	let placaTitulo: TextLabel | undefined = undefined;
+	let plTitulo = "";
 	let entInimigos: { [id: number]: EntFrame } = {};
 	let chavesInimigos: number[] = [];
 	let entOutros: { [nome: string]: EntFrame } = {};
@@ -442,7 +455,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let chavesBalas: number[] = [];
 	let entCots: { [id: number]: EntFrame | undefined } = {};
 	let chavesCots: number[] = [];
-	const fx = criarEfeitos(arena, telaJogo);
+	const fx = criarEfeitos(arena, telaJogo, () => {
+		// Título do nível SÓ no flash (último quadradinho chegou)
+		if (nivelPendente > 0) {
+			mostrarBanner(`NÍVEL ${nivelPendente}!`, 2.5);
+			nivelPendente = 0;
+		}
+	});
 	const chat = criarChat(telaJogo);
 
 	// Input PC (só envia; servidor decide)
@@ -450,11 +469,26 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let teclaBaixo = false;
 	let teclaEsq = false;
 	let teclaDir = false;
+	let fogoMouse = false;
+	let autoTiro = false;
 	let envDx = 0;
 	let envDy = 0;
+	let envAx = 0;
+	let envAy = 0;
+	let envFogo = false;
+	let envAuto = false;
+	let envT = 0;
 
-	function enviarEntrada(dx: number, dy: number, dash: boolean): void {
-		Remotes.Client.Get("Entrada").SendToServer({ dx: dx, dy: dy, dash: dash });
+	function enviarEntrada(
+		dx: number,
+		dy: number,
+		ax: number,
+		ay: number,
+		fogo: boolean,
+		auto: boolean,
+		dash: boolean,
+	): void {
+		Remotes.Client.Get("Entrada").SendToServer({ dx: dx, dy: dy, ax: ax, ay: ay, fogo: fogo, auto: auto, dash: dash });
 	}
 
 	const mapearTecla = (codigo: Enum.KeyCode, apertou: boolean): void => {
@@ -468,7 +502,12 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			teclaDir = apertou;
 		} else if (apertou && (codigo === Enum.KeyCode.LeftShift || codigo === Enum.KeyCode.L)) {
 			if (estado === "jogo" && painelAberto === undefined) {
-				enviarEntrada(envDx, envDy, true);
+				enviarEntrada(envDx, envDy, envAx, envAy, envFogo, envAuto, true);
+			}
+		} else if (apertou && codigo === Enum.KeyCode.E) {
+			if (estado === "jogo" && painelAberto === undefined) {
+				autoTiro = !autoTiro;
+				mostrarBanner(autoTiro ? "TIRO AUTOMÁTICO: ON" : "TIRO AUTOMÁTICO: OFF", 1);
 			}
 		} else if (apertou && codigo === Enum.KeyCode.P) {
 			if (estado === "jogo") {
@@ -478,12 +517,25 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	};
 
 	UserInputService.InputBegan.Connect((input, processado) => {
-		if (processado || estado !== "jogo") {
+		if (estado !== "jogo") {
+			return;
+		}
+		if (input.UserInputType === Enum.UserInputType.MouseButton1) {
+			if (!processado && painelAberto === undefined) {
+				fogoMouse = true;
+			}
+			return;
+		}
+		if (processado) {
 			return;
 		}
 		mapearTecla(input.KeyCode, true);
 	});
 	UserInputService.InputEnded.Connect((input) => {
+		if (input.UserInputType === Enum.UserInputType.MouseButton1) {
+			fogoMouse = false; // soltar sempre apaga (evita tiro preso)
+			return;
+		}
 		mapearTecla(input.KeyCode, false);
 	});
 	botPausa.Activated.Connect(() => {
@@ -723,7 +775,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		primeiraFoto = false;
 		envDx = 0;
 		envDy = 0;
-		enviarEntrada(0, 0, false);
+		envAx = 0;
+		envAy = 0;
+		envFogo = false;
+		envAuto = false;
+		envT = 0;
+		fogoMouse = false;
+		autoTiro = false;
+		enviarEntrada(0, 0, 0, 0, false, false, false);
 		limparEntidades();
 		garantirPoolTiles();
 		mostrarBanner("CARREGANDO MASMORRA...", 9999);
@@ -741,7 +800,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		valor: number,
 	): void {
 		estado = "fim";
-		enviarEntrada(0, 0, false);
+		enviarEntrada(0, 0, 0, 0, false, false, false);
 		txtFimTitulo.Text = venceu ? "VITÓRIA!" : "DERROTADO...";
 		txtFimTitulo.TextColor3 = venceu ? COR_DESTAQUE : COR_PERIGO;
 		txtFimStats.Text =
@@ -802,15 +861,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				fx.floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
 			}
 			if (foto.nivel > antes.nivel) {
-				mostrarBanner(`NÍVEL ${foto.nivel}!`, 3.0);
 				fx.floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
-				fx.iniciarNivel(
-					brilhoPlayer,
-					px,
-					py,
-					// Parede de verdade OU vazio fora do mapa (charGrade devolve "R" fora)
-					(tx, ty) => eSolido(charGrade(tx, ty)),
-				);
+				nivelPendente = foto.nivel;
+				fx.iniciarNivel(brilhoPlayer, px, py, (tx, ty) => eSolido(charGrade(tx, ty)));
 			}
 			for (const e of foto.inimigos) {
 				const hpAntes = inimigosVistos[e.id];
@@ -819,7 +872,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				}
 				inimigosVistos[e.id] = e.hp;
 			}
-			const chaveMochila = foto.mochila.join(",") + "|" + foto.eqArma + "|" + foto.eqArmadura + "|" + foto.eqAcess;
+			const chaveMochila =
+				foto.mochila.join(",") + "|" + foto.eqArma + "|" + foto.eqArmadura + "|" + foto.eqAcess + "|" + foto.tituloEq;
 			if (ultimaMochila !== "" && chaveMochila !== ultimaMochila && painelAberto !== undefined) {
 				refreshPainel();
 			}
@@ -864,7 +918,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	});
 
 	// ===== Entidades (render a partir da foto, com suavização) =====
-	function obterInimigo(id: number, tam: number, cor: Color3): EntFrame {
+	function obterInimigo(id: number, tam: number, cor: Color3, nv: number): EntFrame {
 		let ent = entInimigos[id];
 		if (ent === undefined) {
 			const f = novoQuadro(arena, `E${id}`, new UDim2(0, tam, 0, tam), new UDim2(0, 0, 0, 0), cor, 0);
@@ -872,6 +926,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			borda(f, Color3.fromRGB(10, 10, 10), 2);
 			const barra = novoQuadro(f, "HP", new UDim2(1, 0, 0, 4), new UDim2(0, 0, 0, -6), COR_VIDA, 0);
 			barra.ZIndex = 9;
+			const rot = novoTexto(
+				f,
+				"NvE",
+				`Nv ${nv}`,
+				9,
+				COR_TEXTO,
+				new UDim2(0, tam + 22, 0, 10),
+				new UDim2(0, -11, 0, tam + 2),
+			);
+			rot.ZIndex = 9;
 			ent = { frame: f, barra: barra, rx: 0, ry: 0 };
 			entInimigos[id] = ent;
 			chavesInimigos.push(id);
@@ -920,7 +984,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			1,
 		);
 		brilho.ZIndex = 11;
-		const placa = novoQuadro(p, "Placa", new UDim2(0, 44, 0, 30), new UDim2(0, -12, 1, 4), COR_FUNDO, 1);
+		const placa = novoQuadro(p, "Placa", new UDim2(0, 44, 0, 40), new UDim2(0, -12, 1, 4), COR_FUNDO, 1);
 		placa.ZIndex = 12;
 		const pvFundo = novoQuadro(
 			placa,
@@ -957,12 +1021,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			new UDim2(0, 0, 0, 20),
 		);
 		pnome.ZIndex = 14;
+		const ptitulo = novoTexto(placa, "Titulo", "", 9, COR_DESTAQUE, new UDim2(1, 0, 0, 10), new UDim2(0, 0, 0, 30));
+		ptitulo.ZIndex = 14;
+		ptitulo.Visible = false;
 		framePlayer = p;
 		olhoPlayer = olho;
 		brilhoPlayer = brilho;
 		placaVida = pv;
 		placaXp = pxp;
 		placaNv = pnv;
+		placaTitulo = ptitulo;
 	}
 
 	function limparEntidades(): void {
@@ -1007,6 +1075,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			placaVida = undefined;
 			placaXp = undefined;
 			placaNv = undefined;
+			placaTitulo = undefined;
 		}
 		barraBossFundo.Visible = false;
 		txtBoss.Visible = false;
@@ -1017,6 +1086,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		plRY = 0;
 		fx.limpar();
 		chat.limpar();
+		nivelPendente = 0;
 	}
 
 	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
@@ -1159,7 +1229,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					},
 				);
 			}
-		} else {
+		} else if (painelAberto === "equip") {
 			tituloPainel.Text = `EQUIPADO — dano ${foto.dano} | HP máx ${foto.hpMax}`;
 			const slots: [string, string][] = [
 				["arma", foto.eqArma],
@@ -1176,10 +1246,33 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					adicionarLinha(`${NOME_SLOT[slot]}: — vazio —`, false, "", () => {});
 				}
 			}
+		} else if (painelAberto === "titulos") {
+			tituloPainel.Text = "TÍTULOS";
+			for (const t of TITULOS) {
+				const tid = t.id;
+				let tem = false;
+				for (const m of foto.titulos) {
+					if (m === tid) {
+						tem = true;
+						break;
+					}
+				}
+				if (foto.tituloEq === tid) {
+					adicionarLinha(`${t.nome} (em uso)\n${t.descricao}`, true, "REMOVER", () => {
+						Remotes.Client.Get("Remover").SendToServer("titulo");
+					});
+				} else if (tem) {
+					adicionarLinha(`${t.nome}\n${t.descricao}`, true, "EQUIPAR", () => {
+						Remotes.Client.Get("Equipar").SendToServer(tid);
+					});
+				} else {
+					adicionarLinha(`${t.nome} (bloqueado)\n${t.descricao}`, false, "", () => {});
+				}
+			}
 		}
 	}
 
-	function abrirPainel(aba: "tarefas" | "mochila" | "equip"): void {
+	function abrirPainel(aba: "tarefas" | "mochila" | "equip" | "titulos"): void {
 		painelAberto = aba;
 		painel.Visible = true;
 		refreshPainel();
@@ -1193,6 +1286,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	abaMissoes.Activated.Connect(() => abrirPainel("tarefas"));
 	abaMochila.Activated.Connect(() => abrirPainel("mochila"));
 	abaEquip.Activated.Connect(() => abrirPainel("equip"));
+	abaTitulos.Activated.Connect(() => abrirPainel("titulos"));
 	btnFecharPainel.Activated.Connect(() => fecharPainel());
 	btnOpcoes.Activated.Connect(() => {
 		if (painelAberto === undefined) {
@@ -1223,6 +1317,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (estado === "jogo") {
 			let mx = 0;
 			let my = 0;
+			let ax = 0;
+			let ay = 0;
 			if (painelAberto === undefined) {
 				if (teclaCima) {
 					my -= 1;
@@ -1241,11 +1337,36 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					mx /= m;
 					my /= m;
 				}
+				// Mira do mouse em coordenadas da arena
+				const mouse = UserInputService.GetMouseLocation();
+				const [inset] = GuiService.GetGuiInset();
+				const ddx = mouse.X - (px - camX);
+				const ddy = mouse.Y - inset.Y - (py - camY);
+				const dd = math.sqrt(ddx * ddx + ddy * ddy);
+				if (dd > 2) {
+					ax = math.floor((ddx / dd) * 20 + 0.5) / 20;
+					ay = math.floor((ddy / dd) * 20 + 0.5) / 20;
+				}
 			}
-			if (mx !== envDx || my !== envDy) {
+			const fogoEff = painelAberto === undefined && fogoMouse;
+			envT += dt;
+			if (
+				mx !== envDx ||
+				my !== envDy ||
+				ax !== envAx ||
+				ay !== envAy ||
+				fogoEff !== envFogo ||
+				autoTiro !== envAuto ||
+				(fogoEff && envT > 0.2)
+			) {
 				envDx = mx;
 				envDy = my;
-				enviarEntrada(mx, my, false);
+				envAx = ax;
+				envAy = ay;
+				envFogo = fogoEff;
+				envAuto = autoTiro;
+				envT = 0;
+				enviarEntrada(mx, my, ax, ay, fogoEff, autoTiro, false);
 			}
 		}
 		if (estado !== "jogo") {
@@ -1326,6 +1447,20 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				plNv = foto.nivel;
 				placaNv.Text = `Nv ${foto.nivel}`;
 			}
+			let nomeTitulo = "";
+			if (foto.tituloEq !== "") {
+				for (const t of TITULOS) {
+					if (t.id === foto.tituloEq) {
+						nomeTitulo = t.nome;
+						break;
+					}
+				}
+			}
+			if (placaTitulo !== undefined && nomeTitulo !== plTitulo) {
+				plTitulo = nomeTitulo;
+				placaTitulo.Text = nomeTitulo;
+				placaTitulo.Visible = nomeTitulo !== "";
+			}
 			if (olhoPlayer !== undefined) {
 				// Olho orbita 360°: segue a direção analógica do movimento
 				olhoPlayer.Position = new UDim2(0, 7 + foto.fx * 4, 0, 7 + foto.fy * 4);
@@ -1337,7 +1472,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const vistos: { [id: number]: boolean } = {};
 		for (const e of foto.inimigos) {
 			vistos[e.id] = true;
-			const ent = obterInimigo(e.id, e.tam, new Color3(e.r / 255, e.g / 255, e.b / 255));
+			const ent = obterInimigo(e.id, e.tam, new Color3(e.r / 255, e.g / 255, e.b / 255), e.nv);
 			ent.frame.BackgroundColor3 = new Color3(e.r / 255, e.g / 255, e.b / 255);
 			suavizar(ent, e.x, e.y, dt);
 			ent.frame.Position = new UDim2(0, tX(ent.rx) - e.tam / 2, 0, tY(ent.ry) - e.tam / 2);

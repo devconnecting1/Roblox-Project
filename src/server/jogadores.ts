@@ -10,12 +10,13 @@ import {
 	MUNDO_A,
 	MUNDO_L,
 	QUESTS,
+	TITULOS,
 	calcularValor,
 	xpParaNivel,
 } from "shared/pixelquest/Dados";
 import { EntradaPayload } from "shared/pixelquest/Dados";
 import { areaDe, areaSolida } from "./mundo";
-import { InimigoS, JogadorS, QuestS, danoTotal, dist2, empurrarBala, mundo, statInt } from "./estado";
+import { JogadorS, QuestS, danoTotal, dist2, empurrarBala, mundo, statInt } from "./estado";
 import { difundir, enviar } from "./foto";
 
 // ---------- Construção ----------
@@ -51,8 +52,14 @@ export function novoJogador(player: Player, nasc: [number, number]): JogadorS {
 		dashCdT: 0,
 		dirX: 0,
 		dirY: 0,
+		ax: 0,
+		ay: 0,
+		fogo: false,
+		auto: false,
 		morto: false,
 		pausado: false,
+		titulos: ["apoiador"],
+		tituloEq: "apoiador",
 	};
 }
 
@@ -94,6 +101,17 @@ export function equiparItem(player: Player, id: string): void {
 	const js = mundo.jogadores.get(player);
 	if (js === undefined || js.morto) {
 		return;
+	}
+	for (const t of TITULOS) {
+		if (t.id === id) {
+			for (const m of js.titulos) {
+				if (m === id) {
+					js.tituloEq = id;
+					break;
+				}
+			}
+			return;
+		}
 	}
 	for (let i = 0; i < js.mochila.size(); i++) {
 		if (js.mochila[i].id !== id) {
@@ -142,6 +160,8 @@ export function removerSlot(player: Player, slot: string): void {
 		ajustarHpBonus(js, js.eqAcess.hp, 0);
 		js.mochila.push(js.eqAcess);
 		js.eqAcess = undefined;
+	} else if (slot === "titulo") {
+		js.tituloEq = undefined;
 	}
 }
 
@@ -160,6 +180,17 @@ export function aplicarEntrada(player: Player, e: EntradaPayload): void {
 	}
 	js.dirX = dx;
 	js.dirY = dy;
+	let ax = e.ax;
+	let ay = e.ay;
+	const ma = math.sqrt(ax * ax + ay * ay);
+	if (ma > 1) {
+		ax /= ma;
+		ay /= ma;
+	}
+	js.ax = ax;
+	js.ay = ay;
+	js.fogo = e.fogo;
+	js.auto = e.auto;
 	if (e.dash && js.dashCdT <= 0) {
 		js.dashT = 0.18;
 		js.dashCdT = 3;
@@ -185,7 +216,7 @@ export function ganharXp(js: JogadorS, q: number): void {
 		js.xpProx = xpParaNivel(js.nivel);
 		js.hpMax += 4;
 		js.hp = js.hpMax;
-		enviar(js.player, { tipo: "banner", texto: `NÍVEL ${js.nivel}!`, duracao: 1.6 });
+		// Sem banner aqui: o cliente mostra o título no flash do level-up
 	}
 }
 
@@ -320,39 +351,34 @@ export function atualizarJogadores(dt: number): void {
 		if (js.invencT > 0) {
 			js.invencT -= dt;
 		}
-		// Tiro automático no mais próximo
+		// Tiro mirado no mouse (botão segurado ou automático com E)
 		if (js.tiroT > 0) {
 			js.tiroT -= dt;
 		}
-		if (js.tiroT <= 0) {
-			let melhor: InimigoS | undefined = undefined;
-			let melhorD = 420 * 420;
-			for (const e of mundo.inimigos) {
-				const d = dist2(js.x, js.y, e.x, e.y);
-				if (d < melhorD) {
-					melhorD = d;
-					melhor = e;
-				}
+		if ((js.fogo || js.auto) && js.tiroT <= 0) {
+			let ax = js.ax;
+			let ay = js.ay;
+			if (ax * ax + ay * ay < 0.001) {
+				ax = js.fx;
+				ay = js.fy;
 			}
-			if (melhor !== undefined) {
-				const dx = melhor.x - js.x;
-				const dy = melhor.y - js.y;
-				const d = math.sqrt(dx * dx + dy * dy);
-				if (d > 1) {
-					empurrarBala({
-						x: js.x,
-						y: js.y,
-						vx: (dx / d) * c.velTiro,
-						vy: (dy / d) * c.velTiro,
-						vida: 1.6,
-						dano: danoTotal(js),
-						amiga: true,
-						tam: c.tamTiro,
-					});
-					js.fx = dx / d;
-					js.fy = dy / d;
-				}
+			const ma = math.sqrt(ax * ax + ay * ay);
+			if (ma > 0) {
+				ax /= ma;
+				ay /= ma;
 			}
+			empurrarBala({
+				x: js.x,
+				y: js.y,
+				vx: ax * c.velTiro,
+				vy: ay * c.velTiro,
+				vida: 1.6,
+				dano: danoTotal(js),
+				amiga: true,
+				tam: c.tamTiro,
+			});
+			js.fx = ax;
+			js.fy = ay;
 			js.tiroT = c.cadencia;
 		}
 	}

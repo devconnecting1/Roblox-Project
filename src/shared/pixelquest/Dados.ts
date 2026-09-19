@@ -194,6 +194,7 @@ export interface InimigoInfo {
 	cadenciaTiro: number;
 	velBala: number;
 	danoBala: number;
+	tiros: number; // balas por disparo (1 = mira única, 3 = leque)
 }
 
 export const INIMIGOS: InimigoInfo[] = [
@@ -211,6 +212,7 @@ export const INIMIGOS: InimigoInfo[] = [
 		cadenciaTiro: 0,
 		velBala: 0,
 		danoBala: 0,
+		tiros: 1,
 	},
 	{
 		nome: "Papagaio Tropical",
@@ -226,6 +228,7 @@ export const INIMIGOS: InimigoInfo[] = [
 		cadenciaTiro: 0,
 		velBala: 0,
 		danoBala: 0,
+		tiros: 1,
 	},
 	{
 		nome: "Marinheiro",
@@ -241,6 +244,55 @@ export const INIMIGOS: InimigoInfo[] = [
 		cadenciaTiro: 1.1,
 		velBala: 170,
 		danoBala: 5,
+		tiros: 1,
+	},
+	{
+		nome: "Caranguejo Apressado",
+		hp: 22,
+		danoContato: 6,
+		velocidade: 150,
+		xp: 10,
+		moedaMin: 1,
+		moedaMax: 3,
+		cor: Color3.fromRGB(210, 110, 40),
+		tamanho: 20,
+		atira: false,
+		cadenciaTiro: 0,
+		velBala: 0,
+		danoBala: 0,
+		tiros: 1,
+	},
+	{
+		nome: "Água-Viva",
+		hp: 26,
+		danoContato: 5,
+		velocidade: 55,
+		xp: 12,
+		moedaMin: 2,
+		moedaMax: 4,
+		cor: Color3.fromRGB(255, 130, 190),
+		tamanho: 22,
+		atira: true,
+		cadenciaTiro: 1.6,
+		velBala: 140,
+		danoBala: 4,
+		tiros: 3,
+	},
+	{
+		nome: "Tubarão",
+		hp: 40,
+		danoContato: 10,
+		velocidade: 170,
+		xp: 16,
+		moedaMin: 2,
+		moedaMax: 5,
+		cor: Color3.fromRGB(120, 140, 170),
+		tamanho: 26,
+		atira: false,
+		cadenciaTiro: 0,
+		velBala: 0,
+		danoBala: 0,
+		tiros: 1,
 	},
 ];
 
@@ -258,6 +310,7 @@ export const BOSS: InimigoInfo = {
 	cadenciaTiro: 0.8,
 	velBala: 145,
 	danoBala: 7,
+	tiros: 3,
 };
 
 /** Inimigos por área (0–3; área 4 = boss). Nascem ao liberar a área. */
@@ -268,9 +321,11 @@ export function tiposPorArea(area: number): number[] {
 	if (area < 1) {
 		return [0];
 	} else if (area < 2) {
-		return [0, 1];
+		return [0, 1, 3];
+	} else if (area < 3) {
+		return [0, 1, 2, 3, 4];
 	}
-	return [0, 1, 2];
+	return [1, 2, 3, 4, 5];
 }
 
 // ---------- Quests (estilo "Derrote 11...") ----------
@@ -332,8 +387,12 @@ export function calcularValor(moedas: number, questsCompletas: number, venceu: b
 
 // ---------- Protocolo rede (cliente↔servidor, via @rbxts/net) ----------
 export interface EntradaPayload {
-	dx: number; // -1..1
-	dy: number; // -1..1
+	dx: number; // -1..1 (mover)
+	dy: number; // -1..1 (mover)
+	ax: number; // -1..1 (mira do mouse)
+	ay: number; // -1..1 (mira do mouse)
+	fogo: boolean; // botão do mouse segurado
+	auto: boolean; // tiro automático ligado (tecla E)
 	dash: boolean; // borda de subida: servidor aplica se cooldown ok
 }
 
@@ -344,6 +403,7 @@ export interface FotoInimigo {
 	hp: number;
 	hpMax: number;
 	tam: number;
+	nv: number; // nível = área + 1
 	boss: boolean;
 	r: number;
 	g: number;
@@ -403,6 +463,8 @@ export interface Foto {
 	questsCompletas: number;
 	bossFracao: number; // -1 = sem boss à vista
 	mochila: string[];
+	titulos: string[]; // títulos desbloqueados (ids)
+	tituloEq: string; // título equipado ("" = nenhum)
 	eqArma: string;
 	eqArmadura: string;
 	eqAcess: string;
@@ -424,3 +486,14 @@ export type EventoPayload =
 			quests: number;
 			valor: number;
 	  };
+
+// ---------- Títulos (aba do painel; exibido abaixo do jogador) ----------
+export interface TituloInfo {
+	id: string;
+	nome: string;
+	descricao: string;
+}
+
+export const TITULOS: TituloInfo[] = [
+	{ id: "apoiador", nome: "Apoiador Inicial", descricao: "Para quem chegou cedo na masmorra." },
+];

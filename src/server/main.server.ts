@@ -41,7 +41,7 @@ Remotes.Server.Get("Equipar").Connect((player, id) => {
 });
 
 Remotes.Server.Get("Remover").Connect((player, slot) => {
-	if (!eIdTexto(slot) || (slot !== "arma" && slot !== "armadura" && slot !== "acess")) {
+	if (!eIdTexto(slot) || (slot !== "arma" && slot !== "armadura" && slot !== "acess" && slot !== "titulo")) {
 		return;
 	}
 	removerSlot(player, slot);

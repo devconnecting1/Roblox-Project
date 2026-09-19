@@ -27,6 +27,10 @@ export const Remotes = Net.Definitions.Create({
 export const eEntrada = t.strictInterface({
 	dx: t.numberConstrained(-1, 1),
 	dy: t.numberConstrained(-1, 1),
+	ax: t.numberConstrained(-1, 1),
+	ay: t.numberConstrained(-1, 1),
+	fogo: t.boolean,
+	auto: t.boolean,
 	dash: t.boolean,
 });
 

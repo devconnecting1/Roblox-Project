@@ -70,9 +70,9 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 - **Loot:** inimigos derrubam Espada de Ferro/Armadura de Couro (duplicata vira moedas); quest dá Anel de Valor; boss garante Espada Rúnica + Cota de Malha
 - **Fontes:** `FontFace` Gotham em toda UI + contorno em todo texto; p/ Geist similar, suba o TTF (Creator Dashboard → Fonts) e ponha o ID em `FONTE_ID` (`src/client/jogo.ts`)
 - **ZIndex à prova de regressão:** `ZIndexBehavior=Sibling` + camadas (mapa 1–20, HUD 50+, painel 65, telas 70) — HUD nunca mais fica atrás de tile
-- **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (atira!) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell)
-- **Controles (PC):** WASD/setas movem em todas as direções, tiro automático no inimigo mais próximo, SHIFT/L = dash (invencibilidade breve), P pausa, ≡ OPÇÕES = tarefas/mochila/equipamentos (pausa o jogo)
-- **HUD do jogador sob o personagem:** plaquinha com username + barra de vida + barra de XP + nível (topo só tem moedas, onda e quests); o olho branco do sprite aponta para a direção do movimento
+- **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (tiro único!), **Caranguejo Apressado** (rápido), **Água-Viva** (leque de 3), **Tubarão** (perseguidor frenético) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell); metralhadora dos dois lados com TTK preservado (dano por bala menor, HP compensado)
+- **Controles (PC):** WASD/setas movem, **mouse mira**, BOTÃO ESQ segurado atira, E liga/desliga tiro automático no mouse, SHIFT/L = dash (invencibilidade breve), P pausa individual, ≡ OPÇÕES = tarefas/mochila/equip/títulos (pausa só você)
+- **HUD do jogador sob o personagem:** plaquinha com username + barra de vida + barra de XP + nível + **título equipado** (aba TÍTULOS no painel; "Apoiador Inicial" liberado); o olho branco do sprite aponta para a mira; **inimigos mostram Nv (área+1)** abaixo deles
 - **Visibilidade vs. botões nativos:** HUD do topo começa em x=175/y=36 (longe do ☰/chat e do placar), abaixo da topbar nativa
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
 - **Progressão:** XP → nível (+4 HP máx, cura total); moedas com imã; corações curam; morte/vitória salva via Net nos leaderstats (Moedas, Nivel, Valor)
