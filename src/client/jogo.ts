@@ -134,6 +134,9 @@ function borda(inst: GuiObject, cor: Color3, grossura: number): void {
 	const s = new Instance("UIStroke");
 	s.Color = cor;
 	s.Thickness = grossura;
+	// Border: contorna SÓ a moldura. No modo Contextual (padrão), o stroke
+	// branco cairia em cima do texto dos botões e afogaria as letras.
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
 	s.Parent = inst;
 }
 
