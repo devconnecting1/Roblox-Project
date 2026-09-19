@@ -486,6 +486,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let explorado: boolean[] = [];
 	let camX = 0;
 	let camY = 0;
+	let camPronta = false; // primeira foto: centraliza na hora (sem deslizar do 0,0)
 	let vistaL = 960;
 	let vistaA = 600;
 	let px = 0;
@@ -1079,6 +1080,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		txtBoss.Visible = false;
 		ultimaFoto = undefined;
 		primeiraFoto = false;
+		camPronta = false;
 	}
 
 	// Pools de balas/coletáveis (reuso por índice)
@@ -1293,10 +1295,34 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (foto === undefined) {
 			return;
 		}
-		// Câmera segue o jogador SEM travas: nas bordas aparece o vazio Rocha,
-		// o que comunica o limite do mundo sem "grudar" a visão
-		camX = foto.px - vistaL / 2;
-		camY = foto.py - vistaA / 2;
+		// Câmera com dead zone: o jogador anda livre no centro da tela e a
+		// câmera só acompanha (suavizada) ao encostar nas margens — sem travas
+		// de borda: no limite do mundo aparece Rocha
+		if (!camPronta) {
+			camPronta = true;
+			camX = foto.px - vistaL / 2;
+			camY = foto.py - vistaA / 2;
+		} else {
+			const margemX = vistaL * 0.18;
+			const margemY = vistaA * 0.18;
+			let alvoX = camX;
+			let alvoY = camY;
+			const sx = foto.px - camX;
+			const sy = foto.py - camY;
+			if (sx < margemX) {
+				alvoX = foto.px - margemX;
+			} else if (sx > vistaL - margemX) {
+				alvoX = foto.px - (vistaL - margemX);
+			}
+			if (sy < margemY) {
+				alvoY = foto.py - margemY;
+			} else if (sy > vistaA - margemY) {
+				alvoY = foto.py - (vistaA - margemY);
+			}
+			const k = 1 - math.exp(-8 * dt);
+			camX += (alvoX - camX) * k;
+			camY += (alvoY - camY) * k;
+		}
 		debug.profilebegin("PQ_Explorado");
 		marcarExplorado();
 		debug.profileend();
