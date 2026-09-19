@@ -1,4 +1,4 @@
-# Casa 3D de Teste — roblox-ts + Rojo
+# Roblox-Project — Casa 3D de Teste (roblox-ts + Rojo)
 
 Casa construída 100% via código TypeScript compilado para Luau, pronta para usar no **Roblox Studio via plugin do Rojo**.
 

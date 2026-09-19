@@ -1,5 +1,5 @@
 {
-	"name": "roblox-ts-game",
+	"name": "Roblox-Project",
 	"globIgnorePaths": [
 		"**/package.json",
 		"**/tsconfig.json"
