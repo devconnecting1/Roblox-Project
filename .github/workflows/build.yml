@@ -1,0 +1,41 @@
+name: Build Roblox Place
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: roblox-ts build (TS -> Luau)
+        run: npm run build
+
+      - name: Instalar Rojo
+        uses: rojo-rbx/setup-rojo@v0
+        with:
+          global: true
+
+      - name: Rojo build (.rbxlx)
+        run: rojo build -o build.rbxlx
+
+      - name: Upload place
+        uses: actions/upload-artifact@v4
+        with:
+          name: place
+          path: build.rbxlx

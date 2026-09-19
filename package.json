@@ -1,0 +1,25 @@
+{
+  "name": "roblox-casa-3d",
+  "version": "1.0.0",
+  "description": "Casa 3D de teste feita com roblox-ts + Rojo. Build automático via GitHub Actions.",
+  "main": "index.js",
+  "scripts": {
+    "build": "rbxtsc",
+    "watch": "rbxtsc -w",
+    "build:place": "rbxtsc && rojo build -o build.rbxlx",
+    "serve": "rojo serve",
+    "dev": "rbxtsc -w"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "devDependencies": {
+    "@rbxts/compiler-types": "^3.0.0-types.0",
+    "@rbxts/types": "^1.0.953",
+    "prettier": "^3.9.8",
+    "roblox-ts": "^3.0.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@rbxts/services": "^1.6.0"
+  }
+}
