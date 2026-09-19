@@ -4,7 +4,11 @@
  * Visual puro (anel que voa ao centro, brilho, flash, pisca). O nível real
  * vem do servidor; aqui só a celebração, dirigida pelo loop de render.
  */
-import { borda, novoQuadro, novoTexto, COR_TEXTO, COR_XP } from "./ui";
+import { borda, novoQuadro, novoTexto, COR_TEXTO } from "./ui";
+import { TILE } from "shared/pixelquest/Dados";
+
+// Quadradinho do level-up: escuro como a parede de onde saiu
+const COR_NIVEL = Color3.fromRGB(38, 42, 54);
 
 interface Flutuante {
 	label: TextLabel;
@@ -13,14 +17,20 @@ interface Flutuante {
 
 interface ParticulaNivel {
 	frame: Frame;
-	ang: number;
+	x0: number; // mundo: parede de onde saiu
+	y0: number;
 	atraso: number;
 	t: number;
 }
 
 export interface FxHandle {
 	floater: (sx: number, sy: number, texto: string, cor: Color3) => void;
-	iniciarNivel: (brilho: Frame | undefined) => void;
+	iniciarNivel: (
+		brilho: Frame | undefined,
+		px: number,
+		py: number,
+		ehParede: (tx: number, ty: number) => boolean,
+	) => void;
 	atualizar: (
 		dt: number,
 		px: number,
@@ -61,19 +71,51 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 		flutuantes.push({ label: l, vida: 0.9 });
 	}
 
-	function iniciarNivel(brilho: Frame | undefined): void {
-		// Anel de quadradinhos que voa ao centro + brilho + flash + pisca + título
+	function iniciarNivel(
+		brilho: Frame | undefined,
+		px: number,
+		py: number,
+		ehParede: (tx: number, ty: number) => boolean,
+	): void {
+		// Quadradinhos ESCUROS saem das paredes ao redor e voam DEVAGAR ao centro
 		const N = 26;
+		const pcx = math.floor(px / TILE);
+		const pcy = math.floor(py / TILE);
+		const muros: [number, number][] = [];
+		for (let r = 2; r <= 6; r++) {
+			for (let dy = -r; dy <= r; dy++) {
+				for (let dx = -r; dx <= r; dx++) {
+					if (math.max(math.abs(dx), math.abs(dy)) !== r) {
+						continue;
+					}
+					if (ehParede(pcx + dx, pcy + dy)) {
+						muros.push([(pcx + dx + 0.5) * TILE, (pcy + dy + 0.5) * TILE]);
+					}
+				}
+			}
+		}
 		for (let k = 0; k < N; k++) {
-			const f = novoQuadro(arena, `N${proxIdLocal}`, new UDim2(0, 8, 0, 8), new UDim2(0, -50, 0, -50), COR_XP, 0);
+			const f = novoQuadro(arena, `N${proxIdLocal}`, new UDim2(0, 4, 0, 4), new UDim2(0, -50, 0, -50), COR_NIVEL, 0);
 			proxIdLocal++;
 			f.ZIndex = 19;
 			borda(f, COR_TEXTO, 1);
 			f.Visible = false;
-			partsNivel.push({ frame: f, ang: (k / N) * math.pi * 2, atraso: k * 0.018, t: 0 });
+			let sx = px;
+			let sy = py;
+			if (muros.size() > 0) {
+				const m = muros[(k * 7) % muros.size()];
+				sx = m[0];
+				sy = m[1];
+			} else {
+				// Sem parede por perto: anel simples (fallback)
+				const a = (k / N) * math.pi * 2;
+				sx = px + math.cos(a) * 78;
+				sy = py + math.sin(a) * 78;
+			}
+			partsNivel.push({ frame: f, x0: sx, y0: sy, atraso: k * 0.045, t: 0 });
 		}
 		alvoBrilho = brilho;
-		brilhoT = 1.4;
+		brilhoT = 2.8;
 		fxAtivo = true;
 		fxFlash = false;
 	}
@@ -103,22 +145,26 @@ export function criarEfeitos(arena: Frame, telaJogo: Frame): FxHandle {
 		}
 		// Level-up: anel voa ao centro, jogador brilha, flash + pisca
 		if (fxAtivo) {
-			const cx0 = tX(px) - 4;
-			const cy0 = tY(py) - 4;
 			for (let i = partsNivel.size() - 1; i >= 0; i--) {
 				const pt = partsNivel[i];
 				if (pt.atraso > 0) {
 					pt.atraso -= dt;
 				} else {
-					pt.t += dt / 0.55;
+					pt.t += dt / 1.3;
 					if (pt.t >= 1) {
 						pt.frame.Destroy();
 						partsNivel[i] = partsNivel[partsNivel.size() - 1];
 						partsNivel.pop();
 					} else {
-						const e = 1 - (1 - pt.t) * (1 - pt.t); // ease-out: acelera no centro
-						const r = 78 * (1 - e);
-						pt.frame.Position = new UDim2(0, cx0 + math.cos(pt.ang) * r, 0, cy0 + math.sin(pt.ang) * r);
+						const e = pt.t * pt.t * (3 - 2 * pt.t); // smoothstep: sai devagar, pousa suave
+						const tam = 4 + 4 * e;
+						pt.frame.Size = new UDim2(0, tam, 0, tam);
+						pt.frame.Position = new UDim2(
+							0,
+							tX(pt.x0 + (px - pt.x0) * e) - tam / 2,
+							0,
+							tY(pt.y0 + (py - pt.y0) * e) - tam / 2,
+						);
 						pt.frame.Visible = true;
 					}
 				}

@@ -786,9 +786,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				fx.floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
 			}
 			if (foto.nivel > antes.nivel) {
-				mostrarBanner(`NÍVEL ${foto.nivel}!`, 2.4);
+				mostrarBanner(`NÍVEL ${foto.nivel}!`, 3.0);
 				fx.floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
-				fx.iniciarNivel(brilhoPlayer);
+				fx.iniciarNivel(
+					brilhoPlayer,
+					px,
+					py,
+					(tx, ty) => tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY && eSolido(charGrade(tx, ty)),
+				);
 			}
 			for (const e of foto.inimigos) {
 				const hpAntes = inimigosVistos[e.id];
