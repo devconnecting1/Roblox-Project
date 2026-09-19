@@ -719,6 +719,7 @@ export function atualizar(dt: number): void {
 	}
 	mundo.tempo += dt;
 	const c = CLASSES[0];
+	debug.profilebegin("PQ_Jogadores");
 
 	// Jogadores: movimento (deslizamento) + tiro automático
 	for (const [, js] of mundo.jogadores) {
@@ -790,8 +791,10 @@ export function atualizar(dt: number): void {
 			js.tiroT = c.cadencia;
 		}
 	}
+	debug.profileend(); // PQ_Jogadores
 
 	// Inimigos: visão com paredes, memória e caça em equipe
+	debug.profilebegin("PQ_Inimigos");
 	for (let i = mundo.inimigos.size() - 1; i >= 0; i--) {
 		const e = mundo.inimigos[i];
 		// 1. Tenta avistar (vivo mais próximo, com linha de visão)
@@ -950,6 +953,7 @@ export function atualizar(dt: number): void {
 		}
 	}
 
+	debug.profileend(); // PQ_Inimigos
 	// Separação leve anti-empilhamento
 	if (mundo.inimigos.size() <= 30) {
 		for (let i = 0; i < mundo.inimigos.size(); i++) {
@@ -1071,11 +1075,13 @@ export function atualizar(dt: number): void {
 	mundo.snapT += dt;
 	if (mundo.snapT >= 1 / 20) {
 		mundo.snapT = 0;
+		debug.profilebegin("PQ_Snapshots");
 		for (const [, js] of mundo.jogadores) {
 			if (!js.morto) {
 				enviarFoto(js);
 			}
 		}
+		debug.profileend(); // PQ_Snapshots
 	}
 }
 

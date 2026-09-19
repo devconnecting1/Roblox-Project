@@ -496,6 +496,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let tempo = 0;
 	let ultimoFotoT = -99;
 	let semente = 0;
+	let hudMoedas = -1;
+	let hudOnda = "";
+	let hudPausa = false;
+	let hudBossV = false;
+	let plVida = -1;
+	let plXp = -1;
+	let plNv = -1;
+	let dbgT = 0;
 	let proxIdLocal = 1;
 	let painelAberto: "tarefas" | "mochila" | "equip" | undefined = undefined;
 	let ultimaMochila = "";
@@ -1289,8 +1297,12 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		// o que comunica o limite do mundo sem "grudar" a visão
 		camX = foto.px - vistaL / 2;
 		camY = foto.py - vistaA / 2;
+		debug.profilebegin("PQ_Explorado");
 		marcarExplorado();
+		debug.profileend();
+		debug.profilebegin("PQ_Tiles");
 		desenharTiles();
+		debug.profileend();
 
 		// Jogador local
 		garantirPlayer();
@@ -1300,27 +1312,29 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			framePlayer.Position = new UDim2(0, sx, 0, sy);
 			if (placaVida !== undefined) {
 				const fVida = foto.hp / foto.hpMax;
-				placaVida.Size = new UDim2(fVida < 0 ? 0 : fVida, 0, 1, 0);
+				if (fVida !== plVida) {
+					plVida = fVida;
+					placaVida.Size = new UDim2(fVida < 0 ? 0 : fVida, 0, 1, 0);
+				}
 			}
 			if (placaXp !== undefined) {
 				const fXp = foto.xp / foto.xpProx;
-				placaXp.Size = new UDim2(fXp > 1 ? 1 : fXp, 0, 1, 0);
+				if (fXp !== plXp) {
+					plXp = fXp;
+					placaXp.Size = new UDim2(fXp > 1 ? 1 : fXp, 0, 1, 0);
+				}
 			}
-			if (placaNv !== undefined) {
+			if (placaNv !== undefined && foto.nivel !== plNv) {
+				plNv = foto.nivel;
 				placaNv.Text = `Nv ${foto.nivel}`;
 			}
 			if (olhoPlayer !== undefined) {
-				let ox = 7;
-				let oy = 7;
-				if (math.abs(foto.fx) >= math.abs(foto.fy)) {
-					ox = foto.fx >= 0 ? 11 : 3;
-				} else {
-					oy = foto.fy >= 0 ? 11 : 3;
-				}
-				olhoPlayer.Position = new UDim2(0, ox, 0, oy);
+				// Olho orbita 360°: segue a direção analógica do movimento
+				olhoPlayer.Position = new UDim2(0, 7 + foto.fx * 4, 0, 7 + foto.fy * 4);
 			}
 		}
 
+		debug.profilebegin("PQ_Entidades");
 		// Inimigos visíveis (fog aplicado no servidor)
 		const vistos: { [id: number]: boolean } = {};
 		for (const e of foto.inimigos) {
@@ -1387,6 +1401,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			}
 		}
 
+		debug.profileend(); // PQ_Entidades
 		// Flutuantes
 		for (let i = flutuantes.size() - 1; i >= 0; i--) {
 			const f = flutuantes[i];
@@ -1409,22 +1424,39 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			}
 		}
 
-		// HUD
-		txtMoedas.Text = `$ ${foto.moedas}`;
-		txtOnda.Text = foto.bossFracao >= 0 ? "BOSS!" : `ÁREA ${foto.area + 1}`;
-		rotuloPausa.Visible = foto.pausado;
-		if (foto.bossFracao >= 0) {
-			barraBossFundo.Visible = true;
-			txtBoss.Visible = true;
-			txtBoss.Text = "Sereia da Praia";
-			barraBoss.Size = new UDim2(foto.bossFracao, 0, 1, 0);
-		} else {
-			barraBossFundo.Visible = false;
-			txtBoss.Visible = false;
+		// HUD (só reescreve o que mudou: texto refeito custa rasterização)
+		if (foto.moedas !== hudMoedas) {
+			hudMoedas = foto.moedas;
+			txtMoedas.Text = `$ ${foto.moedas}`;
 		}
-		const idadeFoto = tempo - ultimoFotoT;
-		rotuloDebug.Text = `IN ${string.format("%.1f", envDx)},${string.format("%.1f", envDy)} | SV ${math.floor(foto.px)},${math.floor(foto.py)} | F ${string.format("%.1f", idadeFoto)}s | SEED ${semente}`;
-		rotuloDebug.TextColor3 = idadeFoto > 2 ? COR_PERIGO : COR_TEXTO;
+		const ondaTxt = foto.bossFracao >= 0 ? "BOSS!" : `ÁREA ${foto.area + 1}`;
+		if (ondaTxt !== hudOnda) {
+			hudOnda = ondaTxt;
+			txtOnda.Text = ondaTxt;
+		}
+		if (foto.pausado !== hudPausa) {
+			hudPausa = foto.pausado;
+			rotuloPausa.Visible = foto.pausado;
+		}
+		const temBoss = foto.bossFracao >= 0;
+		if (temBoss !== hudBossV) {
+			hudBossV = temBoss;
+			barraBossFundo.Visible = temBoss;
+			txtBoss.Visible = temBoss;
+			if (temBoss) {
+				txtBoss.Text = "Sereia da Praia";
+			}
+		}
+		if (temBoss) {
+			barraBoss.Size = new UDim2(foto.bossFracao, 0, 1, 0);
+		}
+		dbgT += dt;
+		if (dbgT >= 0.1) {
+			dbgT = 0;
+			const idadeFoto = tempo - ultimoFotoT;
+			rotuloDebug.Text = `IN ${string.format("%.1f", envDx)},${string.format("%.1f", envDy)} | SV ${math.floor(foto.px)},${math.floor(foto.py)} | F ${string.format("%.1f", idadeFoto)}s | SEED ${semente}`;
+			rotuloDebug.TextColor3 = idadeFoto > 2 ? COR_PERIGO : COR_TEXTO;
+		}
 	});
 
 	print("[PixelQuest] Cliente renderer pronto (tudo simulado no servidor).");
