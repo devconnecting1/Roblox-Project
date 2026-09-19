@@ -20,6 +20,7 @@ import {
 	ItemInfo,
 	LOOT_BOSS,
 	LOOT_COMUM,
+	MAPAS,
 	MUNDO_A,
 	MUNDO_L,
 	MUNDO_TX,
@@ -33,7 +34,9 @@ import {
 	areaSolida,
 	calcularValor,
 	eSolido,
+	gerarMasmorra,
 	inimigosDaOnda,
+	pontoNascimento,
 	tileNoMundo,
 	xpParaNivel,
 } from "shared/pixelquest/Dados";
@@ -265,6 +268,96 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	);
 	ajuda.TextWrapped = true;
 
+	// ----- Seletor de mapas (5 slots; 2–5 por nível da conta, em breve) -----
+	const telaMapas = novoQuadro(gui, "Mapas", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+	telaMapas.ZIndex = 70;
+	telaMapas.Visible = false;
+	novoTexto(telaMapas, "Titulo", "SELECIONE O MAPA", 40, COR_DESTAQUE, new UDim2(1, 0, 0, 70), new UDim2(0, 0, 0, 60));
+	novoTexto(
+		telaMapas,
+		"Sub",
+		"Suba o Nível da conta completando runs para desbloquear novos mapas.",
+		16,
+		Color3.fromRGB(160, 175, 195),
+		new UDim2(1, 0, 0, 26),
+		new UDim2(0, 0, 0, 135),
+	);
+	const slotsMapa: TextButton[] = [];
+	for (let i = 0; i < MAPAS.size(); i++) {
+		const b = novoBotao(
+			telaMapas,
+			`Slot${i}`,
+			"",
+			new UDim2(0, 170, 0, 150),
+			new UDim2(0.5, -449 + i * 182, 0, 200),
+			COR_PAINEL,
+			15,
+		);
+		slotsMapa.push(b);
+	}
+	const btnVoltarMapas = novoBotao(telaMapas, "Voltar", "← VOLTAR", new UDim2(0, 220, 0, 54), new UDim2(0.5, -110, 0, 380), COR_PAINEL, 18);
+	const avisoMapas = novoTexto(telaMapas, "Aviso", "", 16, COR_DESTAQUE, new UDim2(1, 0, 0, 26), new UDim2(0, 0, 0, 452));
+
+	/** Nível da conta (leaderstats persistente) — base do desbloqueio. */
+	function nivelConta(): number {
+		const jogador = Players.LocalPlayer;
+		if (jogador === undefined) {
+			return 1;
+		}
+		const stats = jogador.FindFirstChild("leaderstats");
+		if (stats === undefined || !stats.IsA("Folder")) {
+			return 1;
+		}
+		const n = stats.FindFirstChild("Nivel");
+		if (n !== undefined && n.IsA("IntValue") && n.Value >= 1) {
+			return n.Value;
+		}
+		return 1;
+	}
+
+	function atualizarSeletor(): void {
+		const nv = nivelConta();
+		for (let i = 0; i < MAPAS.size(); i++) {
+			const m = MAPAS[i];
+			const b = slotsMapa[i];
+			if (i === 0) {
+				b.Text = `MAPA 1\n${m.nome}\n[Dungeon Crawler]`;
+				b.TextColor3 = COR_VIDA;
+				b.BackgroundColor3 = COR_PAINEL;
+			} else {
+				b.Text = `MAPA ${i + 1}\n???\nNv ${m.reqNivel} • EM BREVE`;
+				b.TextColor3 = Color3.fromRGB(130, 140, 155);
+				b.BackgroundColor3 = Color3.fromRGB(18, 22, 30);
+			}
+		}
+	}
+
+	function abrirSeletor(): void {
+		atualizarSeletor();
+		telaMenu.Visible = false;
+		telaFim.Visible = false;
+		telaMapas.Visible = true;
+	}
+
+	for (let i = 0; i < slotsMapa.size(); i++) {
+		const idx = i;
+		slotsMapa[idx].Activated.Connect(() => {
+			if (idx === 0) {
+				telaMapas.Visible = false;
+				comecarRun(0, idx);
+			} else {
+				avisoMapas.Text = `MAPA ${idx + 1} bloqueado: Nv ${MAPAS[idx].reqNivel} (conta) — em breve!`;
+				task.delay(2.5, () => {
+					avisoMapas.Text = "";
+				});
+			}
+		});
+	}
+	btnVoltarMapas.Activated.Connect(() => {
+		telaMapas.Visible = false;
+		telaMenu.Visible = true;
+	});
+
 	// ----- Tela do jogo (tela cheia) -----
 	const telaJogo = novoQuadro(gui, "Jogo", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	telaJogo.ZIndex = 1;
@@ -304,7 +397,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		"Minimapa",
 		new UDim2(0, mapaW, 0, mapaH),
 		new UDim2(1, -(mapaW + 10), 0, TOPO_Y + 50),
-		Color3.fromRGB(20, 60, 110),
+		Color3.fromRGB(22, 24, 32),
 		0,
 	);
 	minimapa.ZIndex = 50;
@@ -369,6 +462,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let estado: "menu" | "jogo" | "fim" = "menu";
 	let pausado = false;
 	let classeIdx = 0;
+	let mapaIdx = 0;
 
 	// Mundo (coordenadas do mundo; câmera converte para tela)
 	let px = MUNDO_L / 2;
@@ -614,11 +708,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		txtBoss.Visible = false;
 	}
 
-	function comecarRun(idx: number): void {
-		classeIdx = idx;
-		const c = CLASSES[idx];
+	function comecarRun(idxClasse: number, idxMapa: number): void {
+		classeIdx = idxClasse;
+		mapaIdx = idxMapa;
+		const c = CLASSES[idxClasse];
 		limparEntidades();
-		const [sx, sy] = acharChaoPerto(MUNDO_L / 2, MUNDO_A / 2, 12);
+		// Mapa 1 = dungeon crawler: masmorra nova a cada run (roguelike)
+		gerarMasmorra();
+		const [nascX, nascY] = pontoNascimento();
+		const [sx, sy] = acharChaoPerto(nascX, nascY, 12);
 		px = sx;
 		py = sy;
 		fx = 1;
@@ -685,10 +783,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 		telaMenu.Visible = false;
 		telaFim.Visible = false;
+		telaMapas.Visible = false;
 		telaJogo.Visible = true;
 		estado = "jogo";
 		garantirPoolTiles();
-		mostrarBanner("EXPLORE A ILHA — SOBREVIVA ÀS 5 ONDAS!", 2.5);
+		mostrarBanner("MASMORRA INICIAL — explore as salas!", 2.5);
 		iniciarOnda(1);
 		print(`[PixelQuest] Run iniciada: ${c.nome}.`);
 	}
@@ -709,13 +808,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		print(`[PixelQuest] Fim de run: vitoria=${venceu} valor=${valor}.`);
 	}
 
-	btnJogar.Activated.Connect(() => comecarRun(0));
-	btnDeNovo.Activated.Connect(() => comecarRun(classeIdx));
+	btnJogar.Activated.Connect(() => abrirSeletor());
+	btnDeNovo.Activated.Connect(() => comecarRun(classeIdx, mapaIdx));
 	btnMenu.Activated.Connect(() => {
 		limparEntidades();
 		estado = "menu";
 		telaFim.Visible = false;
 		telaJogo.Visible = false;
+		telaMapas.Visible = false;
 		telaMenu.Visible = true;
 	});
 

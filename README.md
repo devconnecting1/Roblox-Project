@@ -37,7 +37,8 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 
 ## O jogo
 
-- **Mundo aberto em tela cheia:** ilha procedural 2400×1536 (oceano, praia, grama, palmeiras, rochas com colisão); câmera segue o jogador com culling de tiles + **minimapa** com pontos de inimigos/boss
+- **Mundo aberto em tela cheia:** Mapa 1 = **Masmorra Inicial** (dungeon crawler: salas + corredores gerados por run, tochas, rochas com colisão); câmera segue o jogador com culling de tiles + **minimapa** com pontos de inimigos/boss
+- **Seletor de mapas (5 slots):** Mapa 1 liberado para todos; Mapas 2–5 mostram `Nv 10/20/30/40 • EM BREVE` (desbloqueio pelo Nível da conta nos leaderstats)
 - **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
 - **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado
 - **1 classe:** Aventureiro (equilibrado); novas classes entram quando o balanceamento pedir

@@ -18,43 +18,144 @@ export const MUNDO_TY = 32; // MUNDO_A / TILE
 export const COR_TILE: { [chave: string]: Color3 } = {
 	W: Color3.fromRGB(30, 90, 160),
 	"~": Color3.fromRGB(52, 152, 219),
-	".": Color3.fromRGB(194, 178, 128),
-	",": Color3.fromRGB(210, 196, 148),
-	G: Color3.fromRGB(74, 160, 90),
-	T: Color3.fromRGB(39, 174, 96),
-	"*": Color3.fromRGB(140, 190, 90),
-	R: Color3.fromRGB(120, 124, 130),
+	".": Color3.fromRGB(140, 145, 160),
+	",": Color3.fromRGB(120, 125, 140),
+	G: Color3.fromRGB(100, 105, 120),
+	T: Color3.fromRGB(230, 126, 34),
+	"*": Color3.fromRGB(70, 130, 90),
+	R: Color3.fromRGB(58, 61, 68),
 };
 
-/** Geração determinística do bioma (ilha cercada de oceano). */
+/** Geração da masmorra (dungeon crawler): salas retangulares ligadas por
+ * corredores em L, com tochas e musgo de decoração. Grade refeita a cada run. */
+interface Sala {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	cx: number;
+	cy: number;
+}
+
+let grade: string[][] = [];
+let nascSala: [number, number] = [MUNDO_L / 2, MUNDO_A / 2];
+
+function porChao(tx: number, ty: number): void {
+	if (tx < 1 || ty < 1 || tx >= MUNDO_TX - 1 || ty >= MUNDO_TY - 1) {
+		return;
+	}
+	grade[ty][tx] = (tx + ty) % 9 === 0 ? "," : ".";
+}
+
+function escavarCorredor(ax: number, ay: number, bx: number, by: number): void {
+	const x1 = ax < bx ? ax : bx;
+	const x2 = ax < bx ? bx : ax;
+	for (let x = x1; x <= x2; x++) {
+		porChao(x, ay);
+		porChao(x, ay + 1);
+	}
+	const y1 = ay < by ? ay : by;
+	const y2 = ay < by ? by : ay;
+	for (let y = y1; y <= y2; y++) {
+		porChao(bx, y);
+		porChao(bx + 1, y);
+	}
+}
+
+export function gerarMasmorra(): void {
+	grade = [];
+	for (let ty = 0; ty < MUNDO_TY; ty++) {
+		const linha: string[] = [];
+		for (let tx = 0; tx < MUNDO_TX; tx++) {
+			linha.push("R");
+		}
+		grade.push(linha);
+	}
+	const salas: Sala[] = [];
+	for (let t = 0; t < 80 && salas.size() < 12; t++) {
+		const w = 5 + math.floor(math.random() * 5);
+		const h = 4 + math.floor(math.random() * 4);
+		const x = 2 + math.floor(math.random() * (MUNDO_TX - w - 4));
+		const y = 2 + math.floor(math.random() * (MUNDO_TY - h - 4));
+		let ok = true;
+		for (const s of salas) {
+			if (x < s.x + s.w + 1 && x + w + 1 > s.x && y < s.y + s.h + 1 && y + h + 1 > s.y) {
+				ok = false;
+				break;
+			}
+		}
+		if (!ok) {
+			continue;
+		}
+		const cx = x + math.floor(w / 2);
+		const cy = y + math.floor(h / 2);
+		salas.push({ x: x, y: y, w: w, h: h, cx: cx, cy: cy });
+		for (let yy = y; yy < y + h; yy++) {
+			for (let xx = x; xx < x + w; xx++) {
+				porChao(xx, yy);
+			}
+		}
+	}
+	if (salas.size() === 0) {
+		// Fallback (praticamente impossível): sala central
+		for (let yy = 13; yy < 21; yy++) {
+			for (let xx = 20; xx < 30; xx++) {
+				porChao(xx, yy);
+			}
+		}
+		salas.push({ x: 20, y: 13, w: 10, h: 8, cx: 25, cy: 17 });
+	}
+	for (let i = 1; i < salas.size(); i++) {
+		escavarCorredor(salas[i - 1].cx, salas[i - 1].cy, salas[i].cx, salas[i].cy);
+	}
+	// Decoração: tochas junto à parede, musgo no chão
+	for (let ty = 2; ty < MUNDO_TY - 2; ty++) {
+		for (let tx = 2; tx < MUNDO_TX - 2; tx++) {
+			const ch = grade[ty][tx];
+			if (ch !== "." && ch !== ",") {
+				continue;
+			}
+			const r = math.random();
+			const pertoParede =
+				grade[ty - 1][tx] === "R" || grade[ty + 1][tx] === "R" || grade[ty][tx - 1] === "R" || grade[ty][tx + 1] === "R";
+			if (r < 0.04 && pertoParede) {
+				grade[ty][tx] = "T";
+			} else if (r < 0.12) {
+				grade[ty][tx] = "*";
+			}
+		}
+	}
+	const s0 = salas[0];
+	nascSala = [(s0.cx + 0.5) * TILE, (s0.cy + 0.5) * TILE];
+}
+
+/** Tile da masmorra atual (fora da grade = parede). */
 export function tileNoMundo(tx: number, ty: number): string {
-	if (tx < 2 || ty < 2 || tx >= MUNDO_TX - 2 || ty >= MUNDO_TY - 2) {
-		return "W";
-	}
-	const nx = tx / MUNDO_TX - 0.5;
-	const ny = ty / MUNDO_TY - 0.5;
-	const d = math.sqrt(nx * nx * 4 + ny * ny * 4) + 0.12 * math.sin(tx * 0.7) * math.cos(ty * 0.6);
-	if (d > 0.98) {
-		return "~";
-	}
-	if (d > 0.82) {
-		return ".";
-	}
-	const v = math.sin(tx * 1.3) * math.cos(ty * 1.1) + math.sin(tx * 0.3 + ty * 0.5);
-	if (v > 1.25 && d < 0.55) {
+	if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY || grade.size() === 0) {
 		return "R";
 	}
-	if (v > 0.75) {
-		return "T";
-	}
-	if (v < -0.95) {
-		return "*";
-	}
-	if ((tx + ty) % 9 === 0) {
-		return ",";
-	}
-	return "G";
+	return grade[ty][tx];
 }
+
+/** Ponto de nascimento: centro da primeira sala (entrada da dungeon). */
+export function pontoNascimento(): [number, number] {
+	return nascSala;
+}
+
+// ---------- Mapas (seletor: 5 slots, desbloqueio por nível da conta) ----------
+export interface MapaInfo {
+	nome: string;
+	descricao: string;
+	reqNivel: number;
+}
+
+export const MAPAS: MapaInfo[] = [
+	{ nome: "Masmorra Inicial", descricao: "Dungeon crawler para todos.", reqNivel: 1 },
+	{ nome: "???", descricao: "Em breve.", reqNivel: 10 },
+	{ nome: "???", descricao: "Em breve.", reqNivel: 20 },
+	{ nome: "???", descricao: "Em breve.", reqNivel: 30 },
+	{ nome: "???", descricao: "Em breve.", reqNivel: 40 },
+];
 
 export function eSolido(ch: string): boolean {
 	return ch === "W" || ch === "R";
