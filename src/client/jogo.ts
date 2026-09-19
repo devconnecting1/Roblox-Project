@@ -926,6 +926,28 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		print("[PixelQuest] Entrou no lobby.");
 	}
 
+	function voltarAoJogo(): void {
+		// Servidor trocou o mundo (lobby/dungeon) com a party: sai da tela de fim
+		telaFim.Visible = false;
+		telaMapas.Visible = false;
+		telaJogo.Visible = true;
+		estado = "jogo";
+		primeiraFoto = false;
+		envDx = 0;
+		envDy = 0;
+		envAx = 0;
+		envAy = 0;
+		envFogo = false;
+		envAuto = false;
+		envT = 0;
+		fogoMouse = false;
+		autoTiro = false;
+		enviarEntrada(0, 0, 0, 0, false, false, false);
+		limparEntidades();
+		garantirPoolTiles();
+		mostrarBanner("CARREGANDO...", 2);
+	}
+
 	function mostrarFim(
 		venceu: boolean,
 		area: number,
@@ -1045,6 +1067,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				construirZonas();
 			} else {
 				limparZonas();
+			}
+			if (estado === "fim") {
+				voltarAoJogo();
 			}
 		} else if (ev.tipo === "porta") {
 			if (ev.ty >= 0 && ev.ty < grade.size()) {
