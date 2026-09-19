@@ -31,7 +31,17 @@ import {
 } from "shared/pixelquest/Dados";
 import { Remotes } from "shared/pixelquest/Rede";
 import { EntradaPayload, EventoPayload, Foto } from "shared/pixelquest/Dados";
-import { Porta, abrirPorta, acharChaoPerto, areaDe, areaSolida, chaoNaArea, gerarMundo, gradeStrings, lerTile } from "./mundo";
+import {
+	Porta,
+	abrirPorta,
+	acharChaoPerto,
+	areaDe,
+	areaSolida,
+	chaoNaArea,
+	gerarMundo,
+	gradeStrings,
+	lerTile,
+} from "./mundo";
 
 type EstadoInimigo = "patrulha" | "perseguir" | "cacar";
 
@@ -133,6 +143,7 @@ interface Mundo {
 	bossMorto: boolean;
 	proxId: number;
 	snapT: number;
+	seed: number;
 }
 
 export const mundo: Mundo = {
@@ -151,6 +162,7 @@ export const mundo: Mundo = {
 	bossMorto: false,
 	proxId: 1,
 	snapT: 0,
+	seed: 0,
 };
 
 function dist2(x1: number, y1: number, x2: number, y2: number): number {
@@ -278,6 +290,9 @@ function novaMasmorra(): void {
 	mundo.bossMorto = false;
 	mundo.tempo = 0;
 	mundo.ativo = true;
+	// Seed estilo Minecraft: mesma seed = mesma masmorra (reproduzível p/ debug)
+	mundo.seed = math.random(1, 999999);
+	math.randomseed(mundo.seed);
 	// Só a área 0 nasce com a masmorra; as demais surgem ao liberar a anterior
 	spawnPack(0);
 	print(`[PixelQuest] Masmorra gerada: ${mundo.inimigos.size()} inimigos, ${mundo.portas.size()} portas.`);
@@ -339,7 +354,7 @@ function spawnJogadorEm(player: Player, nasc: [number, number]): void {
 	const [nx, ny] = acharChaoPerto(nasc[0], nasc[1], 12);
 	const js = novoJogador(player, [nx, ny]);
 	mundo.jogadores.set(player, js);
-	enviar(player, { tipo: "mapa", grade: gradeStrings() });
+	enviar(player, { tipo: "mapa", grade: gradeStrings(), seed: mundo.seed });
 	enviar(player, { tipo: "banner", texto: "MASMORRA INICIAL — explore as salas!", duracao: 2.5 });
 	print(`[PixelQuest] ${player.Name} entrou na run.`);
 }
@@ -576,7 +591,15 @@ function matarInimigo(idx: number, assassino: JogadorS): void {
 	for (let k = 0; k < nMoedas; k++) {
 		const a = math.random() * math.pi * 2;
 		mundo.proxId++;
-		mundo.cots.push({ id: mundo.proxId, x: e.x, y: e.y, vx: math.cos(a) * 90, vy: math.sin(a) * 90, tipo: "moeda", fase: math.random() * 6 });
+		mundo.cots.push({
+			id: mundo.proxId,
+			x: e.x,
+			y: e.y,
+			vx: math.cos(a) * 90,
+			vy: math.sin(a) * 90,
+			tipo: "moeda",
+			fase: math.random() * 6,
+		});
 	}
 	if (math.random() < 0.12) {
 		mundo.proxId++;
@@ -750,7 +773,16 @@ export function atualizar(dt: number): void {
 				const dy = melhor.y - js.y;
 				const d = math.sqrt(dx * dx + dy * dy);
 				if (d > 1) {
-					empurrarBala({ x: js.x, y: js.y, vx: (dx / d) * c.velTiro, vy: (dy / d) * c.velTiro, vida: 1.6, dano: danoTotal(js), amiga: true, tam: c.tamTiro });
+					empurrarBala({
+						x: js.x,
+						y: js.y,
+						vx: (dx / d) * c.velTiro,
+						vy: (dy / d) * c.velTiro,
+						vida: 1.6,
+						dano: danoTotal(js),
+						amiga: true,
+						tam: c.tamTiro,
+					});
 					js.fx = dx / d;
 					js.fy = dy / d;
 				}
@@ -871,10 +903,28 @@ export function atualizar(dt: number): void {
 				if (e.boss) {
 					for (let k = -1; k <= 1; k++) {
 						const base = math.atan2(tdy, tdx) + k * 0.22;
-						empurrarBala({ x: e.x, y: e.y, vx: math.cos(base) * e.info.velBala, vy: math.sin(base) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+						empurrarBala({
+							x: e.x,
+							y: e.y,
+							vx: math.cos(base) * e.info.velBala,
+							vy: math.sin(base) * e.info.velBala,
+							vida: 3.5,
+							dano: e.danoBala,
+							amiga: false,
+							tam: 9,
+						});
 					}
 				} else {
-					empurrarBala({ x: e.x, y: e.y, vx: (tdx / td) * e.info.velBala, vy: (tdy / td) * e.info.velBala, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+					empurrarBala({
+						x: e.x,
+						y: e.y,
+						vx: (tdx / td) * e.info.velBala,
+						vy: (tdy / td) * e.info.velBala,
+						vida: 3.5,
+						dano: e.danoBala,
+						amiga: false,
+						tam: 9,
+					});
 				}
 				e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 			}
@@ -885,7 +935,16 @@ export function atualizar(dt: number): void {
 		if (e.boss && e.estado === "perseguir" && e.rajadaT <= 0) {
 			for (let k = 0; k < 12; k++) {
 				const a = (k / 12) * math.pi * 2 + mundo.tempo;
-				empurrarBala({ x: e.x, y: e.y, vx: math.cos(a) * 110, vy: math.sin(a) * 110, vida: 3.5, dano: e.danoBala, amiga: false, tam: 9 });
+				empurrarBala({
+					x: e.x,
+					y: e.y,
+					vx: math.cos(a) * 110,
+					vy: math.sin(a) * 110,
+					vida: 3.5,
+					dano: e.danoBala,
+					amiga: false,
+					tam: 9,
+				});
 			}
 			e.rajadaT = 2.6;
 		}
@@ -1086,6 +1145,8 @@ function enviarFoto(js: JogadorS): void {
 	const foto: Foto = {
 		px: js.x,
 		py: js.y,
+		fx: js.fx,
+		fy: js.fy,
 		hp: js.hp,
 		hpMax: js.hpMax,
 		nivel: js.nivel,

@@ -100,13 +100,37 @@ export const NOME_SLOT: { [k: string]: string } = {
 };
 
 export const ITENS_INICIAIS: ItemInfo[] = [
-	{ id: "espada_treino", nome: "Espada de Treino", slot: "arma", dano: 0, hp: 0, descricao: "Confiável e sem graça.", preco: 5 },
-	{ id: "traje_pano", nome: "Traje de Pano", slot: "armadura", dano: 0, hp: 0, descricao: "Melhor que nada.", preco: 5 },
+	{
+		id: "espada_treino",
+		nome: "Espada de Treino",
+		slot: "arma",
+		dano: 0,
+		hp: 0,
+		descricao: "Confiável e sem graça.",
+		preco: 5,
+	},
+	{
+		id: "traje_pano",
+		nome: "Traje de Pano",
+		slot: "armadura",
+		dano: 0,
+		hp: 0,
+		descricao: "Melhor que nada.",
+		preco: 5,
+	},
 ];
 
 export const LOOT_COMUM: ItemInfo[] = [
 	{ id: "espada_ferro", nome: "Espada de Ferro", slot: "arma", dano: 3, hp: 0, descricao: "+3 de dano.", preco: 12 },
-	{ id: "armadura_couro", nome: "Armadura de Couro", slot: "armadura", dano: 0, hp: 10, descricao: "+10 de HP máx.", preco: 12 },
+	{
+		id: "armadura_couro",
+		nome: "Armadura de Couro",
+		slot: "armadura",
+		dano: 0,
+		hp: 10,
+		descricao: "+10 de HP máx.",
+		preco: 12,
+	},
 ];
 
 export const ANEL_VALOR: ItemInfo = {
@@ -120,11 +144,35 @@ export const ANEL_VALOR: ItemInfo = {
 };
 
 export const LOOT_BOSS: ItemInfo[] = [
-	{ id: "espada_runica", nome: "Espada Rúnica", slot: "arma", dano: 6, hp: 0, descricao: "+6 de dano. Loot da Sereia.", preco: 30 },
-	{ id: "cota_malha", nome: "Cota de Malha", slot: "armadura", dano: 0, hp: 20, descricao: "+20 de HP máx. Loot da Sereia.", preco: 30 },
+	{
+		id: "espada_runica",
+		nome: "Espada Rúnica",
+		slot: "arma",
+		dano: 6,
+		hp: 0,
+		descricao: "+6 de dano. Loot da Sereia.",
+		preco: 30,
+	},
+	{
+		id: "cota_malha",
+		nome: "Cota de Malha",
+		slot: "armadura",
+		dano: 0,
+		hp: 20,
+		descricao: "+20 de HP máx. Loot da Sereia.",
+		preco: 30,
+	},
 ];
 
-const TODOS_ITENS: ItemInfo[] = [ITENS_INICIAIS[0], ITENS_INICIAIS[1], LOOT_COMUM[0], LOOT_COMUM[1], ANEL_VALOR, LOOT_BOSS[0], LOOT_BOSS[1]];
+const TODOS_ITENS: ItemInfo[] = [
+	ITENS_INICIAIS[0],
+	ITENS_INICIAIS[1],
+	LOOT_COMUM[0],
+	LOOT_COMUM[1],
+	ANEL_VALOR,
+	LOOT_BOSS[0],
+	LOOT_BOSS[1],
+];
 
 export const ITEM_POR_ID: { [id: string]: ItemInfo } = {};
 for (const it of TODOS_ITENS) {
@@ -335,6 +383,8 @@ export interface FotoQuest {
 export interface Foto {
 	px: number;
 	py: number;
+	fx: number; // direção do olhar (unitário, p/ olho do sprite)
+	fy: number;
 	hp: number;
 	hpMax: number;
 	nivel: number;
@@ -360,7 +410,16 @@ export interface Foto {
 }
 
 export type EventoPayload =
-	| { tipo: "mapa"; grade: string[] }
+	| { tipo: "mapa"; grade: string[]; seed: number }
 	| { tipo: "porta"; tx: number; ty: number }
 	| { tipo: "banner"; texto: string; duracao: number }
-	| { tipo: "fim"; venceu: boolean; area: number; nivel: number; abates: number; moedas: number; quests: number; valor: number };
+	| {
+			tipo: "fim";
+			venceu: boolean;
+			area: number;
+			nivel: number;
+			abates: number;
+			moedas: number;
+			quests: number;
+			valor: number;
+	  };

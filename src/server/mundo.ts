@@ -139,7 +139,10 @@ export function gerarMundo(): { portas: Porta[]; nasc: [number, number] } {
 			}
 			const r = math.random();
 			const pertoParede =
-				grade[ty - 1][tx] === "R" || grade[ty + 1][tx] === "R" || grade[ty][tx - 1] === "R" || grade[ty][tx + 1] === "R";
+				grade[ty - 1][tx] === "R" ||
+				grade[ty + 1][tx] === "R" ||
+				grade[ty][tx - 1] === "R" ||
+				grade[ty][tx + 1] === "R";
 			if (r < 0.04 && pertoParede) {
 				grade[ty][tx] = "T";
 			} else if (r < 0.12) {

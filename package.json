@@ -8,6 +8,8 @@
     "build": "rbxtsc",
     "watch": "rbxtsc -w",
     "build:place": "rbxtsc && rojo build -o build.rbxlx",
+    "check:format": "prettier --check src",
+    "lint": "eslint src",
     "serve": "rojo serve",
     "dev": "rbxtsc -w"
   },
@@ -16,9 +18,11 @@
   "devDependencies": {
     "@rbxts/compiler-types": "^3.0.0-types.0",
     "@rbxts/types": "^1.0.953",
+    "eslint": "^10.11.0",
+    "eslint-plugin-roblox-ts": "^1.4.1",
     "prettier": "^3.9.8",
     "roblox-ts": "^3.0.0",
-    "typescript": "^7.0.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "dependencies": {
     "@rbxts/net": "^3.0.10",

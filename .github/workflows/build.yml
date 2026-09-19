@@ -23,6 +23,12 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Prettier check (formatação)
+        run: npm run check:format
+
+      - name: ESLint (roblox-ts oficial)
+        run: npm run lint
+
       - name: roblox-ts build (TS -> Luau)
         run: npm run build
 
