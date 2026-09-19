@@ -1,17 +1,8 @@
 import { Players, RunService } from "@rbxts/services";
 import { eEntrada, eIdTexto, eMapaIdx, Remotes } from "shared/pixelquest/Rede";
-import {
-	alternarPausa,
-	aplicarEntrada,
-	atualizar,
-	equiparItem,
-	escolherMapa,
-	garantirLeaderstats,
-	mundo,
-	nivelConta,
-	removerJogador,
-	removerSlot,
-} from "./simulacao";
+import { alternarPausa, aplicarEntrada, equiparItem, removerJogador, removerSlot } from "./jogadores";
+import { garantirLeaderstats, mundo, nivelConta } from "./estado";
+import { atualizar, escolherMapa } from "./simulacao";
 
 // Jogo 100% interface 2D: o avatar 3D nunca nasce.
 Players.CharacterAutoLoads = false;

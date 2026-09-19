@@ -25,6 +25,24 @@ import {
 	Foto,
 } from "shared/pixelquest/Dados";
 import { Remotes } from "shared/pixelquest/Rede";
+import {
+	borda,
+	COR_BALA_INIMIGA,
+	COR_DESCONHECIDO,
+	COR_DESTAQUE,
+	COR_ESCURA,
+	COR_FUNDO,
+	COR_PAINEL,
+	COR_PERIGO,
+	COR_TEXTO,
+	COR_VIDA,
+	COR_XP,
+	novoBotao,
+	novoQuadro,
+	novoTexto,
+	TOPO_Y,
+} from "./ui";
+import { criarEfeitos } from "./efeitos";
 
 // ---------- Tipos internos (render) ----------
 interface EntFrame {
@@ -34,131 +52,11 @@ interface EntFrame {
 	ry: number;
 }
 
-interface Flutuante {
-	label: TextLabel;
-	vida: number;
-}
-
-interface ParticulaNivel {
-	frame: Frame;
-	ang: number;
-	atraso: number;
-	t: number;
-}
-
 interface TilePool {
 	frame: Frame;
 }
 
-// ---------- Cores ----------
-const COR_FUNDO = Color3.fromRGB(13, 17, 23);
-const COR_PAINEL = Color3.fromRGB(28, 34, 46);
-const COR_TEXTO = Color3.fromRGB(240, 246, 252);
-const COR_DESTAQUE = Color3.fromRGB(255, 213, 74);
-const COR_PERIGO = Color3.fromRGB(231, 76, 60);
-const COR_VIDA = Color3.fromRGB(46, 204, 113);
-const COR_XP = Color3.fromRGB(88, 140, 255);
-const COR_BALA_INIMIGA = Color3.fromRGB(255, 70, 180);
-const COR_DESCONHECIDO = Color3.fromRGB(8, 10, 14);
-const TOPO_Y = 36; // abaixo da topbar nativa do Roblox
-
-const COR_ESCURA: { [chave: string]: Color3 } = {};
-for (const ch of ["W", "~", ".", ",", "G", "T", "*", "R", "D"]) {
-	const cor = COR_TILE[ch];
-	COR_ESCURA[ch] = new Color3(cor.R * 0.32, cor.G * 0.32, cor.B * 0.32);
-}
-
-// ---------- Fonte ----------
-const FONTE_ID = 0;
-function fonteJogo(peso: Enum.FontWeight): Font {
-	if (FONTE_ID > 0) {
-		return Font.fromId(FONTE_ID, peso);
-	}
-	// fromEnum usa a fonte embutida (sem baixar families JSON — evita o
-	// "Gotham.json failed to load" no Studio)
-	if (peso === Enum.FontWeight.ExtraBold) {
-		return Font.fromEnum(Enum.Font.GothamBlack);
-	}
-	return Font.fromEnum(Enum.Font.GothamBold);
-}
-function contornoTexto(inst: TextLabel | TextButton): void {
-	const s = new Instance("UIStroke");
-	s.Color = Color3.fromRGB(10, 12, 16);
-	s.Thickness = 2;
-	s.Transparency = 0.25;
-	s.Parent = inst;
-}
-
-// ---------- Helpers de UI ----------
-function borda(inst: GuiObject, cor: Color3, grossura: number): void {
-	const s = new Instance("UIStroke");
-	s.Color = cor;
-	s.Thickness = grossura;
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-	s.Parent = inst;
-}
-
-function novoQuadro(pai: Instance, nome: string, tam: UDim2, pos: UDim2, cor: Color3, transp: number): Frame {
-	const f = new Instance("Frame");
-	f.Name = nome;
-	f.Size = tam;
-	f.Position = pos;
-	f.BackgroundColor3 = cor;
-	f.BackgroundTransparency = transp;
-	f.BorderSizePixel = 0;
-	f.Parent = pai;
-	return f;
-}
-
-function novoTexto(
-	pai: Instance,
-	nome: string,
-	texto: string,
-	tamFonte: number,
-	cor: Color3,
-	tam: UDim2,
-	pos: UDim2,
-): TextLabel {
-	const l = new Instance("TextLabel");
-	l.Name = nome;
-	l.Text = texto;
-	l.FontFace = fonteJogo(Enum.FontWeight.Bold);
-	l.TextSize = tamFonte;
-	l.TextColor3 = cor;
-	l.BackgroundTransparency = 1;
-	l.Size = tam;
-	l.Position = pos;
-	l.TextXAlignment = Enum.TextXAlignment.Center;
-	l.Parent = pai;
-	contornoTexto(l);
-	return l;
-}
-
-function novoBotao(
-	pai: Instance,
-	nome: string,
-	texto: string,
-	tam: UDim2,
-	pos: UDim2,
-	corFundo: Color3,
-	tamFonte: number,
-): TextButton {
-	const b = new Instance("TextButton");
-	b.Name = nome;
-	b.Text = texto;
-	b.FontFace = fonteJogo(Enum.FontWeight.ExtraBold);
-	b.TextSize = tamFonte;
-	b.TextColor3 = COR_TEXTO;
-	b.BackgroundColor3 = corFundo;
-	b.BorderSizePixel = 0;
-	b.Size = tam;
-	b.Position = pos;
-	b.AutoButtonColor = true;
-	b.Parent = pai;
-	borda(b, COR_TEXTO, 2);
-	contornoTexto(b);
-	return b;
-}
+// ---------- Telas (construídas abaixo com ui.ts) ----------
 
 function dist2(x1: number, y1: number, x2: number, y2: number): number {
 	const dx = x2 - x1;
@@ -543,15 +441,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let chavesBalas: number[] = [];
 	let entCots: { [id: number]: EntFrame | undefined } = {};
 	let chavesCots: number[] = [];
-	const flutuantes: Flutuante[] = [];
-	// Efeito de level-up: anel que voa ao centro + brilho + flash + pisca
-	const partsNivel: ParticulaNivel[] = [];
-	let brilhoT = 0;
-	let flashT = 0;
-	let piscaT = 0;
-	let fxAtivo = false;
-	let fxFlash = false;
-	let flashBg: Frame | undefined = undefined;
+	const fx = criarEfeitos(arena, telaJogo);
 
 	// Input PC (só envia; servidor decide)
 	let teclaCima = false;
@@ -876,37 +766,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	});
 
 	// ===== Rede: snapshots + eventos =====
-	function floater(sx: number, sy: number, texto: string, cor: Color3): void {
-		const l = novoTexto(
-			arena,
-			`F${proxIdLocal}`,
-			texto,
-			14,
-			cor,
-			new UDim2(0, 90, 0, 20),
-			new UDim2(0, sx - 45, 0, sy - 10),
-		);
-		l.ZIndex = 20;
-		proxIdLocal++;
-		flutuantes.push({ label: l, vida: 0.9 });
-	}
-
-	function iniciarEfeitoNivel(): void {
-		// Anel de quadradinhos que voa ao centro + brilho + flash + pisca + título
-		const N = 26;
-		for (let k = 0; k < N; k++) {
-			const f = novoQuadro(arena, `N${proxIdLocal}`, new UDim2(0, 8, 0, 8), new UDim2(0, -50, 0, -50), COR_XP, 0);
-			proxIdLocal++;
-			f.ZIndex = 19;
-			borda(f, COR_TEXTO, 1);
-			f.Visible = false;
-			partsNivel.push({ frame: f, ang: (k / N) * math.pi * 2, atraso: k * 0.018, t: 0 });
-		}
-		brilhoT = 1.4;
-		fxAtivo = true;
-		fxFlash = false;
-	}
-
 	Remotes.Client.Get("Foto").Connect((foto) => {
 		const antes = ultimaFoto;
 		ultimaFoto = foto;
@@ -921,20 +780,20 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		// Diffs → feedback (dano, moedas, nível, itens)
 		if (antes !== undefined) {
 			if (foto.hp < antes.hp) {
-				floater(tX(px), tY(py) - 24, `-${antes.hp - foto.hp}`, COR_PERIGO);
+				fx.floater(tX(px), tY(py) - 24, `-${antes.hp - foto.hp}`, COR_PERIGO);
 			}
 			if (foto.moedas > antes.moedas) {
-				floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
+				fx.floater(tX(px), tY(py) - 40, `+$${foto.moedas - antes.moedas}`, COR_DESTAQUE);
 			}
 			if (foto.nivel > antes.nivel) {
 				mostrarBanner(`NÍVEL ${foto.nivel}!`, 2.4);
-				floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
-				iniciarEfeitoNivel();
+				fx.floater(tX(px), tY(py) - 24, "LEVEL UP!", COR_XP);
+				fx.iniciarNivel(brilhoPlayer);
 			}
 			for (const e of foto.inimigos) {
 				const hpAntes = inimigosVistos[e.id];
 				if (hpAntes !== undefined && e.hp < hpAntes) {
-					floater(tX(e.x), tY(e.y) - 18, `${math.floor(hpAntes - e.hp)}`, COR_DESTAQUE);
+					fx.floater(tX(e.x), tY(e.y) - 18, `${math.floor(hpAntes - e.hp)}`, COR_DESTAQUE);
 				}
 				inimigosVistos[e.id] = e.hp;
 			}
@@ -1117,10 +976,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		entCots = {};
 		chavesCots = [];
-		for (const f of flutuantes) {
-			f.label.Destroy();
-		}
-		flutuantes.clear();
 		inimigosVistos = {};
 		if (framePlayer !== undefined) {
 			framePlayer.Destroy();
@@ -1138,18 +993,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		camPronta = false;
 		plRX = 0;
 		plRY = 0;
-		for (const pt of partsNivel) {
-			pt.frame.Destroy();
-		}
-		partsNivel.clear();
-		brilhoT = 0;
-		flashT = 0;
-		piscaT = 0;
-		fxAtivo = false;
-		fxFlash = false;
-		if (flashBg !== undefined) {
-			flashBg.Visible = false;
-		}
+		fx.limpar();
 	}
 
 	// Balas e coletáveis por ID (interpolados; somem ao sair do fog)
@@ -1548,81 +1392,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 
 		debug.profileend(); // PQ_Entidades
-		// Flutuantes
-		for (let i = flutuantes.size() - 1; i >= 0; i--) {
-			const f = flutuantes[i];
-			f.vida -= dt;
-			if (f.vida <= 0) {
-				f.label.Destroy();
-				flutuantes[i] = flutuantes[flutuantes.size() - 1];
-				flutuantes.pop();
-			} else {
-				const p = f.label.Position;
-				f.label.Position = new UDim2(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset - 40 * dt);
-				f.label.TextTransparency = 1 - f.vida / 0.9;
-			}
-		}
-
-		// Efeito de level-up: anel voa ao centro, jogador brilha, flash + pisca
-		if (fxAtivo) {
-			const cx0 = tX(px) - 4;
-			const cy0 = tY(py) - 4;
-			for (let i = partsNivel.size() - 1; i >= 0; i--) {
-				const pt = partsNivel[i];
-				if (pt.atraso > 0) {
-					pt.atraso -= dt;
-				} else {
-					pt.t += dt / 0.55;
-					if (pt.t >= 1) {
-						pt.frame.Destroy();
-						partsNivel[i] = partsNivel[partsNivel.size() - 1];
-						partsNivel.pop();
-					} else {
-						const e = 1 - (1 - pt.t) * (1 - pt.t); // ease-out: acelera no centro
-						const r = 78 * (1 - e);
-						pt.frame.Position = new UDim2(0, cx0 + math.cos(pt.ang) * r, 0, cy0 + math.sin(pt.ang) * r);
-						pt.frame.Visible = true;
-					}
-				}
-			}
-			if (partsNivel.size() === 0 && !fxFlash) {
-				fxFlash = true;
-				flashT = 0.28;
-				piscaT = 0.36;
-				if (flashBg === undefined) {
-					const fb = novoQuadro(
-						telaJogo,
-						"Flash",
-						new UDim2(1, 0, 1, 0),
-						new UDim2(0, 0, 0, 0),
-						Color3.fromRGB(255, 255, 255),
-						0,
-					);
-					fb.ZIndex = 68;
-					fb.Visible = false;
-					flashBg = fb;
-				}
-				flashBg.Visible = true;
-			}
-		}
-		if (brilhoT > 0) {
-			brilhoT -= dt;
-			if (brilhoPlayer !== undefined) {
-				brilhoPlayer.BackgroundTransparency = brilhoT > 0 ? 0.35 + 0.3 * math.sin(tempo * 18) : 1;
-			}
-		}
-		if (flashT > 0 && flashBg !== undefined) {
-			flashT -= dt;
-			flashBg.BackgroundTransparency = flashT > 0 ? 1 - (flashT / 0.28) * 0.85 : 1;
-			if (flashT <= 0) {
-				flashBg.Visible = false;
-				fxAtivo = false;
-			}
-		}
-		if (piscaT > 0 && framePlayer !== undefined) {
-			piscaT -= dt;
-			framePlayer.Visible = piscaT > 0 ? math.floor(piscaT / 0.06) % 2 === 0 : true;
-		}
+		fx.atualizar(dt, px, py, tX, tY, tempo, framePlayer);
 
 		if (bannerT > 0) {
 			bannerT -= dt;

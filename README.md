@@ -25,9 +25,18 @@ Morreu? Ganha **Valor** para a próxima run (roguelike).
 
 ```
 src/
-  server/main.server.ts       -> leaderstats + save via Net (payload validado com t strict)
+  server/main.server.ts       -> leaderstats + remotes Net (validados com t strict)
+  server/simulacao.ts   -> ORQUESTRADOR: novaMasmorra/escolherMapa/spawn + atualizar()
+  server/estado.ts      -> tipos + mundo singleton + utils (danoTotal, empurrarBala, leaderstats)
+  server/visao.ts       -> linha de visão (temVisada, alertas) — fog é o limite dos 2 lados
+  server/foto.ts        -> Evento (mapa/porta/banner/fim) + Foto 20Hz com fog
+  server/jogadores.ts   -> ciclo de vida, input, pausa individual, inventário, XP/quests, cots
+  server/inimigos.ts    -> spawn por área, IA com sentidos, matarInimigo, separação
+  server/projeteis.ts   -> balas voam/morrem na parede/colidem
   client/main.client.ts       -> bootstrap: PlayerGui -> iniciarJogo()
-  client/jogo.ts              -> UI 2D + loop (menu, classes, arena, HUD, quests, boss, fim)
+  client/jogo.ts              -> UI 2D + loop (menu, mapas, arena, HUD, quests, boss, fim)
+  client/ui.ts          -> construtores de UI + fonte + paleta (puro, sem estado)
+  client/efeitos.ts     -> floaters + cinemática de level-up (anel/flash/pisca)
   shared/pixelquest/Dados.ts  -> classes, inimigos, boss, quests, mundo aberto + colisão (puro)
   shared/pixelquest/Rede.ts   -> Remotes Net tipados (SalvarRun) + validador eSavePayload
   services.d.ts               -> ponto de extensão p/ tipos do DataModel
