@@ -27,7 +27,7 @@ src/
   server/main.server.ts       -> leaderstats + save via Net (payload validado com t strict)
   client/main.client.ts       -> bootstrap: PlayerGui -> iniciarJogo()
   client/jogo.ts              -> UI 2D + loop (menu, classes, arena, HUD, quests, boss, fim)
-  shared/pixelquest/Dados.ts  -> classes, inimigos, boss, quests, mapa, progressão (puro)
+  shared/pixelquest/Dados.ts  -> classes, inimigos, boss, quests, mundo aberto + colisão (puro)
   shared/pixelquest/Rede.ts   -> Remotes Net tipados (SalvarRun) + validador eSavePayload
   services.d.ts               -> ponto de extensão p/ tipos do DataModel
 default.project.json          -> mapeia out/ para DataModel (ServerScriptService, ReplicatedStorage, StarterPlayer)
@@ -37,9 +37,13 @@ build.rbxlx                   -> place gerado pelo rojo (ignorado no git, Artifa
 
 ## O jogo
 
+- **Mundo aberto em tela cheia:** ilha procedural 2400×1536 (oceano, praia, grama, palmeiras, rochas com colisão); câmera segue o jogador com culling de tiles + **minimapa** com pontos de inimigos/boss
+- **Zero 3D:** `CharacterAutoLoads=false` (no `default.project.json` + fallback no servidor) — o avatar nunca nasce/morre; câmera `Scriptable`, mochila nativa desligada, UI opaca cobre a viewport
+- **PC only (por enquanto):** sem D-pad/botões touch, sem pulo nativo — só teclado
 - **Classes:** Guerreiro (HP 46, dano alto), Mago (HP 36, tiro rápido), Ladino (HP 40, veloz)
 - **Inimigos do bioma Praia:** Zumbi de Alga, Papagaio Tropical, Marinheiro (atira!) + **Boss: Sereia da Praia** (rajadas radiais bullet-hell)
-- **Controles:** WASD/setas ou D-pad (mover em todas as direções), tiro automático no inimigo mais próximo, SHIFT/L ou botão DASH (invencibilidade breve), P pausa
+- **Controles (PC):** WASD/setas movem em todas as direções, tiro automático no inimigo mais próximo, SHIFT/L = dash (invencibilidade breve), P pausa
+- **HUD do jogador sob o personagem:** plaquinha pequena com barra de vida + barra de XP + nível (topo só tem moedas, onda, quests e minimapa)
 - **Quests:** Limpeza da Praia (8 abates), Caça ao Tesouro (25 moedas), Recompensa: Sereia (boss) — dão XP + Valor
 - **Progressão:** XP → nível (+4 HP máx, cura total); moedas com imã; corações curam; morte/vitória salva via Net nos leaderstats (Moedas, Nivel, Valor)
 

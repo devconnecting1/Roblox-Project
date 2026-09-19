@@ -1,6 +1,10 @@
 import { Players } from "@rbxts/services";
 import { Remotes, eSavePayload } from "shared/pixelquest/Rede";
 
+// Jogo 100% interface 2D: o avatar 3D nunca nasce (cinturão + suspensórios:
+// Rojo também fixa CharacterAutoLoads=false no default.project.json).
+Players.CharacterAutoLoads = false;
+
 /** Cria leaderstats (Moedas/Nivel/Valor) se ainda não existir. */
 function configurarLeaderstats(jogador: Player): void {
 	let stats = jogador.FindFirstChild("leaderstats");

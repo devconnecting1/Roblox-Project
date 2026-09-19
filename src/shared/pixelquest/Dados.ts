@@ -6,24 +6,98 @@
  * usado pelo servidor e pelo cliente.
  */
 
-// ---------- Arena (bioma Praia, 15x10 tiles de 32px) ----------
-// `.` areia | `,` areia clara | `~` água rasa | `T` palmeira | `*` moita
-export const ARENA_L = 480;
-export const ARENA_A = 320;
-export const TILE = 32;
+// ---------- Mundo aberto (explorável, câmera segue o jogador) ----------
+// Tiles: `W` oceano (sólido) | `~` água rasa | `.` areia | `,` areia clara
+//        `G` grama | `T` palmeira | `*` moita | `R` rocha (sólida)
+export const MUNDO_L = 2400;
+export const MUNDO_A = 1536;
+export const TILE = 48;
+export const MUNDO_TX = 50; // MUNDO_L / TILE
+export const MUNDO_TY = 32; // MUNDO_A / TILE
 
-export const MAPA: string[] = [
-	"................",
-	".,..TT....,,....",
-	"....TT.....,,...",
-	"..,,......**....",
-	"~~~~,,....**..T.",
-	"~~~~~,,......TT.",
-	".~~~~,,...,,....",
-	"..~~~,,.........",
-	"..,,......,,....",
-	"................",
-];
+export const COR_TILE: { [chave: string]: Color3 } = {
+	W: Color3.fromRGB(30, 90, 160),
+	"~": Color3.fromRGB(52, 152, 219),
+	".": Color3.fromRGB(194, 178, 128),
+	",": Color3.fromRGB(210, 196, 148),
+	G: Color3.fromRGB(74, 160, 90),
+	T: Color3.fromRGB(39, 174, 96),
+	"*": Color3.fromRGB(140, 190, 90),
+	R: Color3.fromRGB(120, 124, 130),
+};
+
+/** Geração determinística do bioma (ilha cercada de oceano). */
+export function tileNoMundo(tx: number, ty: number): string {
+	if (tx < 2 || ty < 2 || tx >= MUNDO_TX - 2 || ty >= MUNDO_TY - 2) {
+		return "W";
+	}
+	const nx = tx / MUNDO_TX - 0.5;
+	const ny = ty / MUNDO_TY - 0.5;
+	const d = math.sqrt(nx * nx * 4 + ny * ny * 4) + 0.12 * math.sin(tx * 0.7) * math.cos(ty * 0.6);
+	if (d > 0.98) {
+		return "~";
+	}
+	if (d > 0.82) {
+		return ".";
+	}
+	const v = math.sin(tx * 1.3) * math.cos(ty * 1.1) + math.sin(tx * 0.3 + ty * 0.5);
+	if (v > 1.25 && d < 0.55) {
+		return "R";
+	}
+	if (v > 0.75) {
+		return "T";
+	}
+	if (v < -0.95) {
+		return "*";
+	}
+	if ((tx + ty) % 9 === 0) {
+		return ",";
+	}
+	return "G";
+}
+
+export function eSolido(ch: string): boolean {
+	return ch === "W" || ch === "R";
+}
+
+/** Retorna true se o círculo (x, y, raio) encosta em tile sólido. */
+export function areaSolida(x: number, y: number, raio: number): boolean {
+	const tx1 = math.floor((x - raio) / TILE);
+	const tx2 = math.floor((x + raio) / TILE);
+	const ty1 = math.floor((y - raio) / TILE);
+	const ty2 = math.floor((y + raio) / TILE);
+	for (let tx = tx1; tx <= tx2; tx++) {
+		for (let ty = ty1; ty <= ty2; ty++) {
+			if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
+				return true;
+			}
+			if (eSolido(tileNoMundo(tx, ty))) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/** Procura ponto caminhável perto de (x, y): espiral determinística. */
+export function acharChaoPerto(x: number, y: number, raio: number): [number, number] {
+	if (!areaSolida(x, y, raio)) {
+		return [x, y];
+	}
+	let passo = TILE;
+	while (passo < 600) {
+		for (let k = 0; k < 8; k++) {
+			const a = (k / 8) * math.pi * 2;
+			const cx = x + math.cos(a) * passo;
+			const cy = y + math.sin(a) * passo;
+			if (cx > 60 && cy > 60 && cx < MUNDO_L - 60 && cy < MUNDO_A - 60 && !areaSolida(cx, cy, raio)) {
+				return [cx, cy];
+			}
+		}
+		passo += TILE;
+	}
+	return [MUNDO_L / 2, MUNDO_A / 2];
+}
 
 // ---------- Classes jogáveis (Guerreiro 46HP / Mago 36HP) ----------
 export interface ClasseInfo {

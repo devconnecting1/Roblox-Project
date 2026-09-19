@@ -1,29 +1,33 @@
 /**
- * Pixel Quest 2D — jogo puramente em interfaces 2D (ScreenGui).
+ * Pixel Quest 2D — jogo puramente em interfaces 2D (ScreenGui, PC only).
  *
- * Inspirado no RPG 2D bullet-hell do Roblox: mundo top-down em que você se
- * move em TODAS as direções (WASD/setas/D-pad), desvia de projéteis,
- * derrota inimigos, coleta loot, sobe de nível, completa quests e enfrenta
- * a Sereia da Praia na onda 5. Lore: após 1x1x1x1 destruir a 3ª dimensão,
- * os sobreviventes fugiram para o mundo 2D.
+ * Mundo aberto explorável em tela cheia: a câmera segue o jogador de forma
+ * dinâmica (viewport com culling de tiles). Nada do Workspace 3D é usado —
+ * o avatar 3D nem chega a nascer (CharacterAutoLoads=false).
  *
- * Arquitetura: estado + simulação aqui no cliente (single-player test),
- * progresso persistido via `@rbxts/net` → servidor (leaderstats).
+ * Inspirado no RPG 2D bullet-hell do Roblox: top-down, mover em TODAS as
+ * direções (WASD/setas), desviar de projéteis, loot, XP, quests e boss.
  */
-import { Players, RunService, UserInputService } from "@rbxts/services";
+import { Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
 import {
-	ARENA_A,
-	ARENA_L,
 	BOSS,
 	CLASSES,
+	COR_TILE,
 	INIMIGOS,
 	InimigoInfo,
-	MAPA,
+	MUNDO_A,
+	MUNDO_L,
+	MUNDO_TX,
+	MUNDO_TY,
 	ONDA_BOSS,
 	QUESTS,
 	TILE,
+	acharChaoPerto,
+	areaSolida,
 	calcularValor,
+	eSolido,
 	inimigosDaOnda,
+	tileNoMundo,
 	xpParaNivel,
 } from "shared/pixelquest/Dados";
 import { Remotes } from "shared/pixelquest/Rede";
@@ -81,6 +85,11 @@ interface QuestProg {
 	xp: number;
 }
 
+interface TilePool {
+	frame: Frame;
+	detalhe: Frame;
+}
+
 // ---------- Cores ----------
 const COR_FUNDO = Color3.fromRGB(13, 17, 23);
 const COR_PAINEL = Color3.fromRGB(28, 34, 46);
@@ -90,14 +99,8 @@ const COR_PERIGO = Color3.fromRGB(231, 76, 60);
 const COR_VIDA = Color3.fromRGB(46, 204, 113);
 const COR_XP = Color3.fromRGB(88, 140, 255);
 const COR_BALA_INIMIGA = Color3.fromRGB(255, 70, 180);
-
-const TILE_CORES: { [chave: string]: Color3 } = {
-	".": Color3.fromRGB(194, 178, 128),
-	",": Color3.fromRGB(210, 196, 148),
-	"~": Color3.fromRGB(52, 152, 219),
-	T: Color3.fromRGB(39, 174, 96),
-	"*": Color3.fromRGB(140, 190, 90),
-};
+const TOPO_Y = 36; // abaixo da topbar nativa do Roblox
+const MAX_PONTOS_MINIMAPA = 30;
 
 // ---------- Helpers de UI ----------
 function borda(inst: GuiObject, cor: Color3, grossura: number): void {
@@ -175,6 +178,13 @@ function dist2(x1: number, y1: number, x2: number, y2: number): number {
 
 // ---------- Jogo ----------
 export function iniciarJogo(playerGui: PlayerGui): void {
+	// Sem câmera 3D e sem mochila nativa: o jogo é 100% interface 2D (PC).
+	const camera = Workspace.CurrentCamera;
+	if (camera !== undefined) {
+		camera.CameraType = Enum.CameraType.Scriptable;
+	}
+	StarterGui.SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false);
+
 	// ===== Telas =====
 	const gui = new Instance("ScreenGui");
 	gui.Name = "PixelQuestUI";
@@ -215,7 +225,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const ajuda = novoTexto(
 		telaMenu,
 		"Ajuda",
-		"WASD/setas ou D-pad: mover em todas as direções | Tiro automático no inimigo mais próximo\nSHIFT/L ou DASH: dash com invencibilidade | P: pausar | Desvie das balas rosas!",
+		"PC: WASD/setas para mover em todas as direções | Tiro automático no inimigo mais próximo\nSHIFT/L: dash com invencibilidade | P: pausar | Desvie das balas rosas e explore a ilha!",
 		15,
 		Color3.fromRGB(160, 175, 195),
 		new UDim2(1, -40, 0, 60),
@@ -223,93 +233,63 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	);
 	ajuda.TextWrapped = true;
 
-	// ----- Tela do jogo -----
+	// ----- Tela do jogo (tela cheia) -----
 	const telaJogo = novoQuadro(gui, "Jogo", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	telaJogo.Visible = false;
+	telaJogo.ClipsDescendants = true;
 
-	// HUD superior
-	const hud = novoQuadro(telaJogo, "HUD", new UDim2(1, 0, 0, 54), new UDim2(0, 0, 0, 0), COR_PAINEL, 0);
-	const txtVida = novoTexto(hud, "Vida", "HP", 16, COR_TEXTO, new UDim2(0, 220, 0, 24), new UDim2(0, 12, 0, 4));
-	const barraVidaFundo = novoQuadro(hud, "VidaFundo", new UDim2(0, 220, 0, 12), new UDim2(0, 12, 0, 28), Color3.fromRGB(60, 20, 20), 0);
-	const barraVida = novoQuadro(barraVidaFundo, "Vida", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_VIDA, 0);
-	const txtXp = novoTexto(hud, "Xp", "Nv 1", 16, COR_TEXTO, new UDim2(0, 220, 0, 24), new UDim2(0, 244, 0, 4));
-	const barraXpFundo = novoQuadro(hud, "XpFundo", new UDim2(0, 220, 0, 12), new UDim2(0, 244, 0, 28), Color3.fromRGB(20, 30, 60), 0);
-	const barraXp = novoQuadro(barraXpFundo, "Xp", new UDim2(0, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_XP, 0);
-	const txtMoedas = novoTexto(hud, "Moedas", "$ 0", 18, COR_DESTAQUE, new UDim2(0, 140, 0, 54), new UDim2(0, 476, 0, 0));
-	const txtOnda = novoTexto(hud, "Onda", "ONDA 1", 18, COR_TEXTO, new UDim2(0, 160, 0, 54), new UDim2(0.5, -80, 0, 0));
-	const botPausa = novoBotao(hud, "Pausa", "II", new UDim2(0, 54, 0, 40), new UDim2(1, -66, 0, 7), COR_PAINEL, 18);
+	// Arena = tela cheia (mundo renderizado via câmera + pool de tiles)
+	const arena = novoQuadro(telaJogo, "Arena", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+	arena.ClipsDescendants = true;
 
-	// Painel de quests (direita)
-	const painelQuests = novoQuadro(telaJogo, "Quests", new UDim2(0, 230, 0, 150), new UDim2(1, -242, 0, 66), COR_PAINEL, 0.15);
-	novoTexto(painelQuests, "Titulo", "QUESTS", 16, COR_DESTAQUE, new UDim2(1, 0, 0, 24), new UDim2(0, 0, 0, 4));
+	// HUD superior (abaixo da topbar nativa)
+	const hud = novoQuadro(telaJogo, "HUD", new UDim2(1, 0, 0, 40), new UDim2(0, 0, 0, TOPO_Y), COR_PAINEL, 0.1);
+	const txtMoedas = novoTexto(hud, "Moedas", "$ 0", 18, COR_DESTAQUE, new UDim2(0, 140, 0, 40), new UDim2(0, 12, 0, 0));
+	const txtOnda = novoTexto(hud, "Onda", "ONDA 1", 18, COR_TEXTO, new UDim2(0, 200, 0, 40), new UDim2(0.5, -100, 0, 0));
+	const botPausa = novoBotao(hud, "Pausa", "II", new UDim2(0, 52, 0, 30), new UDim2(1, -62, 0, 5), COR_PAINEL, 16);
+
+	// Painel de quests (esquerda)
+	const painelQuests = novoQuadro(telaJogo, "Quests", new UDim2(0, 215, 0, 150), new UDim2(0, 10, 0, TOPO_Y + 50), COR_PAINEL, 0.15);
+	novoTexto(painelQuests, "Titulo", "QUESTS", 15, COR_DESTAQUE, new UDim2(1, 0, 0, 24), new UDim2(0, 0, 0, 4));
 	const linhasQuest: TextLabel[] = [];
 	for (let i = 0; i < QUESTS.size(); i++) {
 		linhasQuest.push(
-			novoTexto(painelQuests, `Q${i}`, "", 13, COR_TEXTO, new UDim2(1, -16, 0, 36), new UDim2(0, 8, 0, 30 + i * 38)),
+			novoTexto(painelQuests, `Q${i}`, "", 12, COR_TEXTO, new UDim2(1, -16, 0, 36), new UDim2(0, 8, 0, 30 + i * 38)),
 		);
 		linhasQuest[i].TextXAlignment = Enum.TextXAlignment.Left;
 		linhasQuest[i].TextWrapped = true;
 	}
 
-	// Arena central (moldura + área com ClipsDescendants)
-	const moldura = novoQuadro(
+	// Minimapa (direita): navegação no mundo aberto
+	const mapaW = 150;
+	const mapaH = 96;
+	const minimapa = novoQuadro(
 		telaJogo,
-		"Moldura",
-		new UDim2(0, ARENA_L + 16, 0, ARENA_A + 16),
-		new UDim2(0.5, -(ARENA_L + 16) / 2, 0.5, -(ARENA_A + 16) / 2 + 20),
-		Color3.fromRGB(8, 10, 14),
+		"Minimapa",
+		new UDim2(0, mapaW, 0, mapaH),
+		new UDim2(1, -(mapaW + 10), 0, TOPO_Y + 50),
+		Color3.fromRGB(20, 60, 110),
 		0,
 	);
-	borda(moldura, COR_DESTAQUE, 3);
-	const arena = novoQuadro(
-		moldura,
-		"Arena",
-		new UDim2(0, ARENA_L, 0, ARENA_A),
-		new UDim2(0, 8, 0, 8),
-		Color3.fromRGB(194, 178, 128),
-		0,
-	);
-	arena.ClipsDescendants = true;
-
-	// Tiles do bioma (estáticos, criados uma vez)
-	for (let ly = 0; ly < MAPA.size(); ly++) {
-		const linha = MAPA[ly];
-		for (let lx = 0; lx < linha.size(); lx++) {
-			const ch = linha.sub(lx + 1, lx + 1);
-			const cor = TILE_CORES[ch] ?? TILE_CORES["."];
-			const t = novoQuadro(
-				arena,
-				`Tile_${lx}_${ly}`,
-				new UDim2(0, TILE, 0, TILE),
-				new UDim2(0, lx * TILE, 0, ly * TILE),
-				cor,
-				0,
-			);
-			t.ZIndex = 1;
-			if (ch === "T" || ch === "*") {
-				const detalhe = novoQuadro(t, "D", new UDim2(0, 14, 0, 14), new UDim2(0, 9, 0, 6), Color3.fromRGB(20, 90, 50), 0);
-				detalhe.ZIndex = 2;
-			}
-		}
+	borda(minimapa, COR_TEXTO, 2);
+	const pontoPlayer = novoQuadro(minimapa, "Voce", new UDim2(0, 5, 0, 5), new UDim2(0, 0, 0, 0), COR_TEXTO, 0);
+	pontoPlayer.ZIndex = 3;
+	const pontosInimigos: Frame[] = [];
+	for (let i = 0; i < MAX_PONTOS_MINIMAPA; i++) {
+		const p = novoQuadro(minimapa, `E${i}`, new UDim2(0, 4, 0, 4), new UDim2(0, 0, 0, 0), COR_PERIGO, 0);
+		p.Visible = false;
+		p.ZIndex = 2;
+		pontosInimigos.push(p);
 	}
 
 	// Banner central + barra do boss
 	const banner = novoTexto(telaJogo, "Banner", "", 34, COR_DESTAQUE, new UDim2(1, 0, 0, 50), new UDim2(0, 0, 0.35, 0));
 	banner.Visible = false;
-	const barraBossFundo = novoQuadro(telaJogo, "BossFundo", new UDim2(0, 400, 0, 14), new UDim2(0.5, -200, 0, 60), Color3.fromRGB(60, 10, 40), 0);
+	const barraBossFundo = novoQuadro(telaJogo, "BossFundo", new UDim2(0, 400, 0, 14), new UDim2(0.5, -200, 0, TOPO_Y + 46), Color3.fromRGB(60, 10, 40), 0);
 	barraBossFundo.Visible = false;
 	const barraBoss = novoQuadro(barraBossFundo, "Boss", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_PERIGO, 0);
-	const txtBoss = novoTexto(telaJogo, "BossNome", "", 16, COR_TEXTO, new UDim2(0, 400, 0, 22), new UDim2(0.5, -200, 0, 82));
+	const txtBoss = novoTexto(telaJogo, "BossNome", "", 16, COR_TEXTO, new UDim2(0, 400, 0, 22), new UDim2(0.5, -200, 0, TOPO_Y + 62));
 	txtBoss.Visible = false;
-
-	// D-pad mobile (canto inferior esquerdo) + dash (direito)
-	const dpad = novoQuadro(telaJogo, "DPad", new UDim2(0, 190, 0, 190), new UDim2(0, 16, 1, -206), COR_PAINEL, 1);
-	dpad.BackgroundTransparency = 1;
-	const btnCima = novoBotao(dpad, "Cima", "^", new UDim2(0, 58, 0, 58), new UDim2(0, 66, 0, 0), COR_PAINEL, 24);
-	const btnBaixo = novoBotao(dpad, "Baixo", "v", new UDim2(0, 58, 0, 58), new UDim2(0, 66, 0, 124), COR_PAINEL, 24);
-	const btnEsq = novoBotao(dpad, "Esq", "<", new UDim2(0, 58, 0, 58), new UDim2(0, 0, 0, 62), COR_PAINEL, 24);
-	const btnDir = novoBotao(dpad, "Dir", ">", new UDim2(0, 58, 0, 58), new UDim2(0, 132, 0, 62), COR_PAINEL, 24);
-	const btnDash = novoBotao(telaJogo, "Dash", "DASH", new UDim2(0, 110, 0, 58), new UDim2(1, -126, 1, -74), COR_PAINEL, 20);
 
 	// ----- Tela de fim -----
 	const telaFim = novoQuadro(gui, "Fim", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0.25);
@@ -324,8 +304,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let pausado = false;
 	let classeIdx = 0;
 
-	let px = ARENA_L / 2;
-	let py = ARENA_A / 2;
+	// Mundo (coordenadas do mundo; câmera converte para tela)
+	let px = MUNDO_L / 2;
+	let py = MUNDO_A / 2;
+	let camX = 0;
+	let camY = 0;
+	let vistaL = 960;
+	let vistaA = 600;
 	let fx = 1;
 	let fy = 0;
 	let hp = 10;
@@ -352,13 +337,21 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	let framePlayer: Frame | undefined = undefined;
 	let olhoPlayer: Frame | undefined = undefined;
+	let placaVida: Frame | undefined = undefined;
+	let placaXp: Frame | undefined = undefined;
+	let placaNv: TextLabel | undefined = undefined;
 	const balas: Bala[] = [];
 	const inimigos: Inimigo[] = [];
 	const coletaveis: Coletavel[] = [];
 	const flutuantes: Flutuante[] = [];
+	const tiles: TilePool[] = [];
+	let tilesCols = 0;
+	let tilesRows = 0;
+	let camTileX = -1;
+	let camTileY = -1;
 	let quests: QuestProg[] = [];
 
-	// Input (teclado + D-pad compartilham as flags)
+	// Input PC (teclado; sem touch — jogo exclusivo de PC por enquanto)
 	let teclaCima = false;
 	let teclaBaixo = false;
 	let teclaEsq = false;
@@ -389,17 +382,6 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	UserInputService.InputEnded.Connect((input) => {
 		mapearTecla(input.KeyCode, false);
 	});
-
-	const ligarBotaoDir = (botao: TextButton, ligar: (v: boolean) => void): void => {
-		botao.MouseButton1Down.Connect(() => ligar(true));
-		botao.MouseButton1Up.Connect(() => ligar(false));
-		botao.MouseLeave.Connect(() => ligar(false));
-	};
-	ligarBotaoDir(btnCima, (v) => (teclaCima = v));
-	ligarBotaoDir(btnBaixo, (v) => (teclaBaixo = v));
-	ligarBotaoDir(btnEsq, (v) => (teclaEsq = v));
-	ligarBotaoDir(btnDir, (v) => (teclaDir = v));
-	btnDash.MouseButton1Down.Connect(() => tentarDash());
 	botPausa.Activated.Connect(() => alternarPausa());
 
 	function alternarPausa(): void {
@@ -418,6 +400,77 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		dashCdT = 3;
 		if (invencT < 0.25) {
 			invencT = 0.25;
+		}
+	}
+
+	// ===== Câmera + tiles (mundo aberto) =====
+	function tX(x: number): number {
+		return x - camX;
+	}
+	function tY(y: number): number {
+		return y - camY;
+	}
+
+	function atualizarCamera(): void {
+		camX = math.clamp(px - vistaL / 2, 0, MUNDO_L - vistaL);
+		camY = math.clamp(py - vistaA / 2, 0, MUNDO_A - vistaA);
+	}
+
+	function garantirPoolTiles(): void {
+		const w = arena.AbsoluteSize.X;
+		const h = arena.AbsoluteSize.Y;
+		if (w < 10 || h < 10) {
+			return;
+		}
+		const cols = math.ceil(w / TILE) + 2;
+		const rows = math.ceil(h / TILE) + 2;
+		if (cols === tilesCols && rows === tilesRows) {
+			return;
+		}
+		for (const t of tiles) {
+			t.frame.Destroy();
+		}
+		tiles.clear();
+		tilesCols = cols;
+		tilesRows = rows;
+		vistaL = w;
+		vistaA = h;
+		for (let i = 0; i < cols * rows; i++) {
+			const f = novoQuadro(arena, `T${i}`, new UDim2(0, TILE, 0, TILE), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
+			f.ZIndex = 1;
+			const d = novoQuadro(f, "D", new UDim2(0, 20, 0, 20), new UDim2(0, 14, 0, 10), COR_FUNDO, 0);
+			d.ZIndex = 2;
+			d.Visible = false;
+			tiles.push({ frame: f, detalhe: d });
+		}
+		camTileX = -1;
+		camTileY = -1;
+	}
+
+	function desenharTiles(): void {
+		const tx0 = math.floor(camX / TILE);
+		const ty0 = math.floor(camY / TILE);
+		if (tx0 === camTileX && ty0 === camTileY) {
+			return; // câmera não cruzou tile: nada a redesenhar
+		}
+		camTileX = tx0;
+		camTileY = ty0;
+		for (let i = 0; i < tiles.size(); i++) {
+			const tx = tx0 + (i % tilesCols);
+			const ty = ty0 + math.floor(i / tilesCols);
+			const t = tiles[i];
+			let ch = "W";
+			if (tx >= 0 && ty >= 0 && tx < MUNDO_TX && ty < MUNDO_TY) {
+				ch = tileNoMundo(tx, ty);
+			}
+			t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
+			t.frame.Position = new UDim2(0, tx * TILE - camX, 0, ty * TILE - camY);
+			if (ch === "T" || ch === "*" || ch === "R") {
+				t.detalhe.Visible = true;
+				t.detalhe.BackgroundColor3 = ch === "R" ? Color3.fromRGB(70, 72, 78) : Color3.fromRGB(20, 90, 50);
+			} else {
+				t.detalhe.Visible = false;
+			}
 		}
 	}
 
@@ -458,6 +511,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			framePlayer.Destroy();
 			framePlayer = undefined;
 			olhoPlayer = undefined;
+			placaVida = undefined;
+			placaXp = undefined;
+			placaNv = undefined;
 		}
 		barraBossFundo.Visible = false;
 		txtBoss.Visible = false;
@@ -467,8 +523,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		classeIdx = idx;
 		const c = CLASSES[idx];
 		limparEntidades();
-		px = ARENA_L / 2;
-		py = ARENA_A / 2;
+		const [sx, sy] = acharChaoPerto(MUNDO_L / 2, MUNDO_A / 2, 12);
+		px = sx;
+		py = sy;
 		fx = 1;
 		fy = 0;
 		hpMax = c.hpMax;
@@ -490,26 +547,46 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		dashT = 0;
 		dashCdT = 0;
 		pausado = false;
+		teclaCima = false;
+		teclaBaixo = false;
+		teclaEsq = false;
+		teclaDir = false;
 		quests = [];
 		for (const q of QUESTS) {
 			quests.push({ id: q.id, nome: q.nome, descricao: q.descricao, meta: q.meta, progresso: 0, completa: false, xp: q.xp });
 		}
 		atualizarQuestsUI();
 
-		// Avatar do jogador (quadrado pixel + olho de direção)
-		const p = novoQuadro(arena, "Player", new UDim2(0, 20, 0, 20), new UDim2(0, px - 10, 0, py - 10), c.cor, 0);
+		// Avatar + plaquinha de HUD sob o personagem (vida/XP/nível, pequena)
+		const p = novoQuadro(arena, "Player", new UDim2(0, 20, 0, 20), new UDim2(0, 0, 0, 0), c.cor, 0);
 		p.ZIndex = 10;
 		borda(p, COR_TEXTO, 2);
 		const olho = novoQuadro(p, "Olho", new UDim2(0, 6, 0, 6), new UDim2(0, 11, 0, 7), COR_TEXTO, 0);
 		olho.ZIndex = 11;
+		const placa = novoQuadro(p, "Placa", new UDim2(0, 34, 0, 20), new UDim2(0, -7, 1, 4), COR_FUNDO, 1);
+		placa.ZIndex = 12;
+		const pvFundo = novoQuadro(placa, "VidaFundo", new UDim2(1, 0, 0, 6), new UDim2(0, 0, 0, 0), Color3.fromRGB(60, 20, 20), 0);
+		pvFundo.ZIndex = 13;
+		const pv = novoQuadro(pvFundo, "Vida", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_VIDA, 0);
+		pv.ZIndex = 14;
+		const pxFundo = novoQuadro(placa, "XpFundo", new UDim2(1, 0, 0, 3), new UDim2(0, 0, 0, 7), Color3.fromRGB(20, 30, 60), 0);
+		pxFundo.ZIndex = 13;
+		const pxp = novoQuadro(pxFundo, "Xp", new UDim2(0, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_XP, 0);
+		pxp.ZIndex = 14;
+		const pnv = novoTexto(placa, "Nv", "Nv 1", 10, COR_TEXTO, new UDim2(1, 0, 0, 10), new UDim2(0, 0, 0, 10));
+		pnv.ZIndex = 14;
 		framePlayer = p;
 		olhoPlayer = olho;
+		placaVida = pv;
+		placaXp = pxp;
+		placaNv = pnv;
 
 		telaMenu.Visible = false;
 		telaFim.Visible = false;
 		telaJogo.Visible = true;
 		estado = "jogo";
-		mostrarBanner("SOBREVIVA ÀS 5 ONDAS!", 2.5);
+		garantirPoolTiles();
+		mostrarBanner("EXPLORE A ILHA — SOBREVIVA ÀS 5 ONDAS!", 2.5);
 		iniciarOnda(1);
 		print(`[PixelQuest] Run iniciada: ${c.nome}.`);
 	}
@@ -543,22 +620,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		telaMenu.Visible = true;
 	});
 
-	// ===== Ondas & spawns =====
-	function posicaoSpawn(): [number, number] {
-		const lado = math.random(0, 3);
-		const m = 26;
-		if (lado === 0) {
-			return [m + math.random() * (ARENA_L - m * 2), m];
-		} else if (lado === 1) {
-			return [m + math.random() * (ARENA_L - m * 2), ARENA_A - m];
-		} else if (lado === 2) {
-			return [m, m + math.random() * (ARENA_A - m * 2)];
+	// ===== Spawns no mundo aberto (fora da visão, em chão válido) =====
+	function pontoForaDaVisao(distMin: number, distMax: number): [number, number] {
+		for (let k = 0; k < 14; k++) {
+			const a = math.random() * math.pi * 2;
+			const d = distMin + math.random() * (distMax - distMin);
+			const x = math.clamp(px + math.cos(a) * d, 60, MUNDO_L - 60);
+			const y = math.clamp(py + math.sin(a) * d, 60, MUNDO_A - 60);
+			if (!areaSolida(x, y, 20)) {
+				return [x, y];
+			}
 		}
-		return [ARENA_L - m, m + math.random() * (ARENA_A - m * 2)];
+		return acharChaoPerto(px + 300, py, 20);
 	}
 
 	function nascerInimigo(info: InimigoInfo, eBoss: boolean, sx: number, sy: number): void {
-		const f = novoQuadro(arena, `E${proxId}`, new UDim2(0, info.tamanho, 0, info.tamanho), new UDim2(0, sx, 0, sy), info.cor, 0);
+		const f = novoQuadro(arena, `E${proxId}`, new UDim2(0, info.tamanho, 0, info.tamanho), new UDim2(0, 0, 0, 0), info.cor, 0);
 		f.ZIndex = 8;
 		borda(f, Color3.fromRGB(10, 10, 10), 2);
 		const barra = novoQuadro(f, "HP", new UDim2(1, 0, 0, 4), new UDim2(0, 0, 0, -6), COR_VIDA, 0);
@@ -570,7 +647,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	function iniciarOnda(n: number): void {
 		onda = n;
 		if (n === ONDA_BOSS) {
-			nascerInimigo(BOSS, true, ARENA_L / 2, 70);
+			const [sx, sy] = pontoForaDaVisao(280, 420);
+			nascerInimigo(BOSS, true, sx, sy);
 			mostrarBanner("SEREIA DA PRAIA!", 3);
 			barraBossFundo.Visible = true;
 			txtBoss.Visible = true;
@@ -595,8 +673,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	}
 
 	// ===== Combate & recompensas =====
-	function floater(x: number, y: number, texto: string, cor: Color3): void {
-		const l = novoTexto(arena, `F${proxId}`, texto, 14, cor, new UDim2(0, 90, 0, 20), new UDim2(0, x - 45, 0, y - 10));
+	function floater(sx: number, sy: number, texto: string, cor: Color3): void {
+		const l = novoTexto(arena, `F${proxId}`, texto, 14, cor, new UDim2(0, 90, 0, 20), new UDim2(0, sx - 45, 0, sy - 10));
 		l.ZIndex = 20;
 		proxId++;
 		flutuantes.push({ label: l, vida: 0.9 });
@@ -611,7 +689,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			hpMax += 4;
 			hp = hpMax;
 			mostrarBanner(`NÍVEL ${nivel}!`, 1.6);
-			floater(px, py - 20, "LEVEL UP!", COR_XP);
+			floater(tX(px), tY(py) - 22, "LEVEL UP!", COR_XP);
 			print(`[PixelQuest] Nível ${nivel}.`);
 		}
 	}
@@ -671,7 +749,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	function criarColetavel(x: number, y: number, vx: number, vy: number, tipo: "moeda" | "coracao"): Coletavel {
 		const cor = tipo === "moeda" ? COR_DESTAQUE : COR_PERIGO;
-		const f = novoQuadro(arena, `C${proxId}`, new UDim2(0, 12, 0, 12), new UDim2(0, x, 0, y), cor, 0);
+		const f = novoQuadro(arena, `C${proxId}`, new UDim2(0, 12, 0, 12), new UDim2(0, 0, 0, 0), cor, 0);
 		f.ZIndex = 5;
 		borda(f, Color3.fromRGB(10, 10, 10), 1);
 		proxId++;
@@ -684,7 +762,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		hp -= dano;
 		invencT = 0.9;
-		floater(px, py - 22, `-${dano}`, COR_PERIGO);
+		floater(tX(px), tY(py) - 24, `-${dano}`, COR_PERIGO);
 		if (hp <= 0) {
 			hp = 0;
 			terminarRun(false);
@@ -694,17 +772,17 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	function atirarAmiga(dx: number, dy: number): void {
 		const c = CLASSES[classeIdx];
 		const t = c.tamTiro;
-		const f = novoQuadro(arena, `B${proxId}`, new UDim2(0, t, 0, t), new UDim2(0, px, 0, py), c.cor, 0);
+		const f = novoQuadro(arena, `B${proxId}`, new UDim2(0, t, 0, t), new UDim2(0, 0, 0, 0), c.cor, 0);
 		f.ZIndex = 7;
 		proxId++;
 		balas.push({ x: px, y: py, vx: dx * c.velTiro, vy: dy * c.velTiro, vida: 1.6, dano: c.dano, amiga: true, tam: t, frame: f });
 	}
 
 	function atirarInimiga(x: number, y: number, dx: number, dy: number, vel: number, dano: number): void {
-		const f = novoQuadro(arena, `EB${proxId}`, new UDim2(0, 9, 0, 9), new UDim2(0, x, 0, y), COR_BALA_INIMIGA, 0);
+		const f = novoQuadro(arena, `EB${proxId}`, new UDim2(0, 9, 0, 9), new UDim2(0, 0, 0, 0), COR_BALA_INIMIGA, 0);
 		f.ZIndex = 6;
 		proxId++;
-		balas.push({ x: x, y: y, vx: dx * vel, vy: dy * vel, vida: 3, dano: dano, amiga: false, tam: 9, frame: f });
+		balas.push({ x: x, y: y, vx: dx * vel, vy: dy * vel, vida: 3.5, dano: dano, amiga: false, tam: 9, frame: f });
 	}
 
 	function mirarJogador(x: number, y: number, vel: number, dano: number): void {
@@ -717,6 +795,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		atirarInimiga(x, y, dx / d, dy / d, vel, dano);
 	}
 
+	function tileSolidoEm(x: number, y: number): boolean {
+		const tx = math.floor(x / TILE);
+		const ty = math.floor(y / TILE);
+		if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
+			return true;
+		}
+		return eSolido(tileNoMundo(tx, ty));
+	}
+
 	// ===== Loop principal =====
 	RunService.Heartbeat.Connect((dt) => {
 		if (estado !== "jogo" || pausado) {
@@ -727,8 +814,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		tempo += dt;
 		const c = CLASSES[classeIdx];
+		garantirPoolTiles();
 
-		// -- movimento em todas as direções --
+		// -- movimento em todas as direções (com deslizamento em paredes) --
 		let mx = 0;
 		let my = 0;
 		if (teclaCima) {
@@ -758,11 +846,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		if (dashCdT > 0) {
 			dashCdT -= dt;
 		}
-		px = math.clamp(px + mx * vel * dt, 14, ARENA_L - 14);
-		py = math.clamp(py + my * vel * dt, 14, ARENA_A - 14);
+		const r = 10;
+		const nx = math.clamp(px + mx * vel * dt, 20, MUNDO_L - 20);
+		if (!areaSolida(nx, py, r)) {
+			px = nx;
+		}
+		const ny = math.clamp(py + my * vel * dt, 20, MUNDO_A - 20);
+		if (!areaSolida(px, ny, r)) {
+			py = ny;
+		}
 		if (invencT > 0) {
 			invencT -= dt;
 		}
+
+		// -- câmera segue o jogador + redesenha tiles --
+		atualizarCamera();
+		desenharTiles();
 
 		// -- tiro automático no inimigo mais próximo (foco em desviar!) --
 		if (tiroT > 0) {
@@ -791,11 +890,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			tiroT = c.cadencia;
 		}
 
-		// -- spawns da onda --
+		// -- spawns da onda (fora da visão) --
 		if (filaRestante > 0) {
 			spawnT -= dt;
 			if (spawnT <= 0) {
-				const [sx, sy] = posicaoSpawn();
+				const [sx, sy] = pontoForaDaVisao(420, 640);
 				nascerInimigo(INIMIGOS[tipoDaOnda()], false, sx, sy);
 				filaRestante--;
 				spawnT = 1.1;
@@ -813,7 +912,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				return;
 			}
 			descansoT = 2.5;
-			floater(px, py - 24, `ONDA ${onda} LIMPA!`, COR_VIDA);
+			floater(tX(px), tY(py) - 26, `ONDA ${onda} LIMPA!`, COR_VIDA);
 		}
 		if (descansoT > 0) {
 			descansoT -= dt;
@@ -829,8 +928,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const dy = py - e.y;
 			const d = math.sqrt(dx * dx + dy * dy);
 			if (d > 1) {
-				e.x += (dx / d) * e.info.velocidade * dt;
-				e.y += (dy / d) * e.info.velocidade * dt;
+				const er = e.info.tamanho / 2;
+				const ex = e.x + (dx / d) * e.info.velocidade * dt;
+				if (!areaSolida(ex, e.y, er)) {
+					e.x = ex;
+				}
+				const ey = e.y + (dy / d) * e.info.velocidade * dt;
+				if (!areaSolida(e.x, ey, er)) {
+					e.y = ey;
+				}
 			}
 			// contato
 			if (d < e.info.tamanho / 2 + 10) {
@@ -840,7 +946,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			if (e.tiroT > 0) {
 				e.tiroT -= dt;
 			}
-			if (e.info.atira && e.tiroT <= 0 && d < 330 && d > 1) {
+			if (e.info.atira && e.tiroT <= 0 && d < 380 && d > 1) {
 				if (e.eBoss) {
 					for (let k = -1; k <= 1; k++) {
 						const base = math.atan2(dy, dx) + k * 0.22;
@@ -868,7 +974,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					e.frame.BackgroundColor3 = e.info.cor;
 				}
 			}
-			e.frame.Position = new UDim2(0, e.x - e.info.tamanho / 2, 0, e.y - e.info.tamanho / 2);
+			e.frame.Position = new UDim2(0, tX(e.x) - e.info.tamanho / 2, 0, tY(e.y) - e.info.tamanho / 2);
 			const fracao = e.hp / e.hpMax;
 			e.barra.Size = new UDim2(fracao < 0 ? 0 : fracao, 0, 0, 4);
 			if (e.eBoss) {
@@ -876,13 +982,39 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			}
 		}
 
-		// -- balas --
+		// -- separação leve (evita empilhamento) --
+		if (inimigos.size() <= 24) {
+			for (let i = 0; i < inimigos.size(); i++) {
+				for (let j = i + 1; j < inimigos.size(); j++) {
+					const a = inimigos[i];
+					const b = inimigos[j];
+					const rr = a.info.tamanho / 2 + b.info.tamanho / 2;
+					const d2 = dist2(a.x, a.y, b.x, b.y);
+					if (d2 > 1 && d2 < rr * rr) {
+						const d = math.sqrt(d2);
+						const emp = ((rr - d) / d) * 0.4;
+						const sx = (b.x - a.x) * emp;
+						const sy = (b.y - a.y) * emp;
+						if (!areaSolida(a.x - sx, a.y - sy, a.info.tamanho / 2)) {
+							a.x -= sx;
+							a.y -= sy;
+						}
+						if (!areaSolida(b.x + sx, b.y + sy, b.info.tamanho / 2)) {
+							b.x += sx;
+							b.y += sy;
+						}
+					}
+				}
+			}
+		}
+
+		// -- balas (morrem na parede) --
 		for (let i = balas.size() - 1; i >= 0; i--) {
 			const b = balas[i];
 			b.x += b.vx * dt;
 			b.y += b.vy * dt;
 			b.vida -= dt;
-			let morta = b.vida <= 0 || b.x < 0 || b.x > ARENA_L || b.y < 0 || b.y > ARENA_A;
+			let morta = b.vida <= 0 || b.x < 0 || b.x > MUNDO_L || b.y < 0 || b.y > MUNDO_A || tileSolidoEm(b.x, b.y);
 			if (!morta) {
 				if (b.amiga) {
 					for (let j = inimigos.size() - 1; j >= 0; j--) {
@@ -892,7 +1024,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 							e.hp -= b.dano;
 							e.hitT = 0.12;
 							e.frame.BackgroundColor3 = COR_TEXTO;
-							floater(e.x, e.y - 16, `${b.dano}`, COR_DESTAQUE);
+							floater(tX(e.x), tY(e.y) - 18, `${b.dano}`, COR_DESTAQUE);
 							morta = true;
 							if (e.hp <= 0) {
 								matarInimigo(j);
@@ -913,7 +1045,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				balas[i] = balas[balas.size() - 1];
 				balas.pop();
 			} else {
-				b.frame.Position = new UDim2(0, b.x - b.tam / 2, 0, b.y - b.tam / 2);
+				b.frame.Position = new UDim2(0, tX(b.x) - b.tam / 2, 0, tY(b.y) - b.tam / 2);
 			}
 		}
 
@@ -924,20 +1056,26 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			col.vx *= 1 - 3 * dt;
 			col.vy *= 1 - 3 * dt;
 			const d2 = dist2(col.x, col.y, px, py);
-			if (d2 < 70 * 70) {
+			if (d2 < 80 * 80) {
 				const d = math.sqrt(d2);
 				if (d > 1) {
-					col.vx = ((px - col.x) / d) * 260;
-					col.vy = ((py - col.y) / d) * 260;
+					col.vx = ((px - col.x) / d) * 280;
+					col.vy = ((py - col.y) / d) * 280;
 				}
 			}
-			col.x += col.vx * dt;
-			col.y += col.vy * dt;
-			if (d2 < 20 * 20) {
+			const cx = col.x + col.vx * dt;
+			if (!areaSolida(cx, col.y, 6)) {
+				col.x = cx;
+			}
+			const cy = col.y + col.vy * dt;
+			if (!areaSolida(col.x, cy, 6)) {
+				col.y = cy;
+			}
+			if (d2 < 22 * 22) {
 				if (col.tipo === "moeda") {
 					moedas++;
 					moedasColetadas++;
-					floater(col.x, col.y - 10, "+1", COR_DESTAQUE);
+					floater(tX(col.x), tY(col.y) - 12, "+1", COR_DESTAQUE);
 					checarQuest("moedas");
 				} else {
 					if (hp + 12 > hpMax) {
@@ -945,14 +1083,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 					} else {
 						hp += 12;
 					}
-					floater(col.x, col.y - 10, "+12", COR_VIDA);
+					floater(tX(col.x), tY(col.y) - 12, "+12", COR_VIDA);
 				}
 				col.frame.Destroy();
 				coletaveis[i] = coletaveis[coletaveis.size() - 1];
 				coletaveis.pop();
 			} else {
 				const salto = math.sin(col.fase) * 2;
-				col.frame.Position = new UDim2(0, col.x - 6, 0, col.y - 6 + salto);
+				col.frame.Position = new UDim2(0, tX(col.x) - 6, 0, tY(col.y) - 6 + salto);
 			}
 		}
 
@@ -979,21 +1117,41 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			}
 		}
 
-		// -- HUD + avatar --
-		const fVida = hp / hpMax;
-		barraVida.Size = new UDim2(fVida < 0 ? 0 : fVida, 0, 1, 0);
-		txtVida.Text = `HP ${hp}/${hpMax}`;
-		const fXp = xp / xpProx;
-		barraXp.Size = new UDim2(fXp > 1 ? 1 : fXp, 0, 1, 0);
-		txtXp.Text = `Nv ${nivel} (${xp}/${xpProx} XP)`;
+		// -- HUD de tela + avatar + plaquinha do jogador --
 		txtMoedas.Text = `$ ${moedas}`;
 		txtOnda.Text = onda >= ONDA_BOSS ? "BOSS!" : `ONDA ${onda}`;
 		if (framePlayer !== undefined) {
-			framePlayer.Position = new UDim2(0, px - 10, 0, py - 10);
+			framePlayer.Position = new UDim2(0, tX(px) - 10, 0, tY(py) - 10);
 			// pisca durante invencibilidade
 			framePlayer.BackgroundTransparency = invencT > 0 && math.floor(tempo * 12) % 2 === 0 ? 0.5 : 0;
 			if (olhoPlayer !== undefined) {
 				olhoPlayer.Position = new UDim2(0, 7 + fx * 5, 0, 7 + fy * 5);
+			}
+			// plaquinha sob o personagem: vida + XP + nível (pequena)
+			if (placaVida !== undefined) {
+				const fVida = hp / hpMax;
+				placaVida.Size = new UDim2(fVida < 0 ? 0 : fVida, 0, 1, 0);
+			}
+			if (placaXp !== undefined) {
+				const fXp = xp / xpProx;
+				placaXp.Size = new UDim2(fXp > 1 ? 1 : fXp, 0, 1, 0);
+			}
+			if (placaNv !== undefined) {
+				placaNv.Text = `Nv ${nivel}`;
+			}
+		}
+
+		// -- minimapa --
+		pontoPlayer.Position = new UDim2(0, (px / MUNDO_L) * mapaW - 2, 0, (py / MUNDO_A) * mapaH - 2);
+		for (let i = 0; i < pontosInimigos.size(); i++) {
+			const dot = pontosInimigos[i];
+			if (i < inimigos.size()) {
+				const e = inimigos[i];
+				dot.Visible = true;
+				dot.BackgroundColor3 = e.eBoss ? COR_BALA_INIMIGA : COR_PERIGO;
+				dot.Position = new UDim2(0, (e.x / MUNDO_L) * mapaW - 2, 0, (e.y / MUNDO_A) * mapaH - 2);
+			} else {
+				dot.Visible = false;
 			}
 		}
 	});
