@@ -18,7 +18,13 @@ export const MUNDO_TY = 60; // MUNDO_A / TILE
 
 /** Raio de visão do Fog of War (px). */
 export const VISAO = 340;
-
+/** Lanterna do jogador: alcance menor que a visão antiga (o escuro é real). */
+export const ALCANCE_LAMP = 260;
+/** Meio-ângulo do cone da lanterna: cos(38°) — humano não enxerga 360°. */
+export const CONE_LAMP = math.cos((38 * math.pi) / 180);
+/** Clarão do disparo: luz 360° como arma de verdade. */
+export const ALCANCE_CLARAO = 330;
+export const DURACAO_CLARAO = 0.12;
 /** Total de áreas da masmorra (última = boss). */
 export const TOTAL_AREAS = 5;
 
@@ -382,6 +388,7 @@ export interface FotoJogador {
 	x: number;
 	y: number;
 	nv: number;
+	flash: boolean; // clarão do disparo (luz real por 1 instante)
 	r: number;
 	g: number;
 	b: number;
@@ -393,11 +400,22 @@ export interface FotoQuest {
 	completa: boolean;
 }
 
+export interface FotoMancha {
+	x: number;
+	y: number;
+	tipo: "sangue" | "corpo";
+	tam: number;
+	r: number;
+	g: number;
+	b: number;
+}
+
 export interface Foto {
 	px: number;
 	py: number;
-	fx: number; // direção do olhar (unitário, p/ olho do sprite)
+	fx: number; // mira AO VIVO do mouse (unitário; olho + cone da lanterna seguem)
 	fy: number;
+	flash: boolean; // clarão do disparo: luz 360° por 1 instante
 	hp: number;
 	hpMax: number;
 	nivel: number;
@@ -413,6 +431,7 @@ export interface Foto {
 	jogadores: FotoJogador[];
 	quests: FotoQuest[];
 	questsCompletas: number;
+	manchas: FotoMancha[]; // sangue/corpos no chão (só o iluminado)
 	bossFracao: number; // -1 = sem boss à vista
 	bossHp: number; // hp atual do boss (0 = sem boss)
 	bossMax: number; // hp máximo do boss (0 = sem boss)

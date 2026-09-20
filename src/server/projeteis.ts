@@ -2,7 +2,7 @@
  * Projéteis (SERVIDOR) — balas voam, morrem na parede e colidem.
  */
 import { MUNDO_A, MUNDO_L } from "shared/pixelquest/Dados";
-import { dist2, mundo } from "./estado";
+import { dist2, mundo, sujarChao } from "./estado";
 import { tileSolidoEm } from "./visao";
 import { ferirJogador, jogadorMaisProximo } from "./jogadores";
 import { matarInimigo } from "./inimigos";
@@ -23,6 +23,7 @@ export function atualizarBalas(dt: number): void {
 					if (dist2(b.x, b.y, e.x, e.y) < rr * rr) {
 						e.hp -= b.dano;
 						e.dormindo = false; // tiro acorda o zumbi
+						sujarChao("sangue", b.x, b.y, 12, 35, 150, 75); // sangue verde no chão
 						morta = true;
 						if (e.hp <= 0) {
 							// assassino = jogador vivo mais próximo do abate

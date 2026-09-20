@@ -5,6 +5,7 @@
 import {
 	ANEL_VALOR,
 	CLASSES,
+	DURACAO_CLARAO,
 	ITENS_INICIAIS,
 	ItemInfo,
 	MUNDO_A,
@@ -48,6 +49,7 @@ export function novoJogador(player: Player, nasc: [number, number]): JogadorS {
 		eqAcess: undefined,
 		invencT: 0,
 		tiroT: 0,
+		flashT: 0,
 		dashT: 0,
 		dashCdT: 0,
 		dirX: 0,
@@ -359,6 +361,9 @@ export function atualizarJogadores(dt: number): void {
 		if (js.tiroT > 0) {
 			js.tiroT -= dt;
 		}
+		if (js.flashT > 0) {
+			js.flashT -= dt;
+		}
 		if ((js.fogo || js.auto) && js.tiroT <= 0) {
 			let ax = js.ax;
 			let ay = js.ay;
@@ -384,6 +389,7 @@ export function atualizarJogadores(dt: number): void {
 			js.fx = ax;
 			js.fy = ay;
 			js.tiroT = c.cadencia;
+			js.flashT = DURACAO_CLARAO; // cada disparo emite luz como arma de verdade
 		}
 	}
 

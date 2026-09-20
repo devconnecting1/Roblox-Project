@@ -60,6 +60,17 @@ export interface CotS {
 	fase: number;
 }
 
+/** Mancha no chão: sangue verde (acerto) ou corpo (morte). Só decoração. */
+export interface ManchaS {
+	x: number;
+	y: number;
+	tipo: "sangue" | "corpo";
+	tam: number;
+	r: number;
+	g: number;
+	b: number;
+}
+
 export interface QuestS {
 	id: string;
 	prog: number;
@@ -88,6 +99,7 @@ export interface JogadorS {
 	eqAcess: ItemInfo | undefined;
 	invencT: number;
 	tiroT: number;
+	flashT: number; // clarão do disparo (luz 360° por 1 instante)
 	dashT: number;
 	dashCdT: number;
 	dirX: number;
@@ -114,6 +126,7 @@ interface Mundo {
 	inimigos: InimigoS[];
 	balas: BalaS[];
 	cots: CotS[];
+	manchas: ManchaS[]; // sangue/corpos no chão (teto: as velhas somem)
 	jogadores: Map<Player, JogadorS>;
 	tempo: number;
 	bossVivo: boolean;
@@ -135,6 +148,7 @@ export const mundo: Mundo = {
 	inimigos: [],
 	balas: [],
 	cots: [],
+	manchas: [],
 	jogadores: new Map(),
 	tempo: 0,
 	bossVivo: false,
@@ -201,6 +215,22 @@ export function danoTotal(js: JogadorS): number {
 		d += js.eqAcess.dano;
 	}
 	return d;
+}
+
+/** Sujam o chão (sangue verde / corpo). Teto de 200: as mais velhas somem. */
+export function sujarChao(
+	tipo: "sangue" | "corpo",
+	x: number,
+	y: number,
+	tam: number,
+	r: number,
+	g: number,
+	b: number,
+): void {
+	if (mundo.manchas.size() >= 200) {
+		mundo.manchas.shift();
+	}
+	mundo.manchas.push({ x: x, y: y, tipo: tipo, tam: tam, r: r, g: g, b: b });
 }
 
 // ---------- Balas ----------

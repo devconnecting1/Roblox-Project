@@ -3,12 +3,12 @@
  *
  * Anti-cheat de visão: o cliente só recebe entidades com linha de visão.
  */
-import { TOTAL_AREAS, VISAO } from "shared/pixelquest/Dados";
+import { TOTAL_AREAS } from "shared/pixelquest/Dados";
 import { EventoPayload, Foto } from "shared/pixelquest/Dados";
 import { Remotes } from "shared/pixelquest/Rede";
 import { areaDe } from "./mundo";
-import { JogadorS, danoTotal, dist2, mundo } from "./estado";
-import { temVisada } from "./visao";
+import { JogadorS, danoTotal, mundo } from "./estado";
+import { dirLamp, noConeLamp, temVisada } from "./visao";
 
 // ---------- Eventos → cliente ----------
 export function enviar(player: Player, ev: EventoPayload): void {
@@ -21,9 +21,9 @@ export function difundir(ev: EventoPayload): void {
 	}
 }
 
-// ---------- Snapshot (só o visível: Fog of War real) ----------
+// ---------- Snapshot (só o iluminado: Fog of War real em cone) ----------
 function visivelPara(js: JogadorS, x: number, y: number): boolean {
-	return dist2(js.x, js.y, x, y) < VISAO * VISAO && temVisada(js.x, js.y, x, y);
+	return noConeLamp(js, x, y) && temVisada(js.x, js.y, x, y);
 }
 
 function enviarFoto(js: JogadorS): void {
@@ -74,7 +74,23 @@ function enviarFoto(js: JogadorS): void {
 		if (outro === js || outro.morto || (!semFog && !visivelPara(js, outro.x, outro.y))) {
 			continue;
 		}
-		fjogs.push({ nome: outro.player.Name, x: outro.x, y: outro.y, nv: outro.nivel, r: 90, g: 220, b: 120 });
+		fjogs.push({
+			nome: outro.player.Name,
+			x: outro.x,
+			y: outro.y,
+			nv: outro.nivel,
+			flash: outro.flashT > 0,
+			r: 90,
+			g: 220,
+			b: 120,
+		});
+	}
+	const fmanchas: Foto["manchas"] = [];
+	for (const m of mundo.manchas) {
+		if (!semFog && !visivelPara(js, m.x, m.y)) {
+			continue;
+		}
+		fmanchas.push({ x: m.x, y: m.y, tipo: m.tipo, tam: m.tam, r: m.r, g: m.g, b: m.b });
 	}
 	const fquests: Foto["quests"] = [];
 	for (const q of js.quests) {
@@ -90,11 +106,13 @@ function enviarFoto(js: JogadorS): void {
 			areas += 2 ** k;
 		}
 	}
+	const [olhoX, olhoY] = dirLamp(js); // mira AO VIVO: olho + cone seguem o mouse
 	const foto: Foto = {
 		px: js.x,
 		py: js.y,
-		fx: js.fx,
-		fy: js.fy,
+		fx: olhoX,
+		fy: olhoY,
+		flash: js.flashT > 0,
 		hp: js.hp,
 		hpMax: js.hpMax,
 		nivel: js.nivel,
@@ -110,6 +128,7 @@ function enviarFoto(js: JogadorS): void {
 		jogadores: fjogs,
 		quests: fquests,
 		questsCompletas: js.questsCompletas,
+		manchas: fmanchas,
 		bossFracao: bossFracao,
 		bossHp: bossHp,
 		bossMax: bossMax,

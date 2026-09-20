@@ -14,7 +14,7 @@ import {
 	tiposPorArea,
 } from "shared/pixelquest/Dados";
 import { abrirPorta, areaDe, areaSolida, chaoEmRet, chaoNaArea } from "./mundo";
-import { InimigoS, JogadorS, dist2, empurrarBala, mundo } from "./estado";
+import { InimigoS, JogadorS, dist2, empurrarBala, mundo, sujarChao } from "./estado";
 import { ALCANCE_VISAO, alertarAliados, temVisada } from "./visao";
 import { checarQuest, darItem, ferirJogador, fimRun, ganharXp } from "./jogadores";
 import { difundir } from "./foto";
@@ -116,6 +116,18 @@ export function matarInimigo(idx: number, assassino: JogadorS): void {
 	mundo.vivosPorArea[e.area]--;
 	assassino.abates++;
 	ganharXp(assassino, e.info.xp);
+	// Corpo no chão + espirro de sangue verde
+	sujarChao(
+		"corpo",
+		e.x,
+		e.y,
+		e.info.tamanho,
+		math.floor(e.info.cor.R * 255 * 0.45),
+		math.floor(e.info.cor.G * 255 * 0.45),
+		math.floor(e.info.cor.B * 255 * 0.45),
+	);
+	sujarChao("sangue", e.x + 14, e.y - 8, 11, 35, 150, 75);
+	sujarChao("sangue", e.x - 12, e.y + 10, 9, 35, 150, 75);
 	const nMoedas = math.random(e.info.moedaMin, e.info.moedaMax);
 	for (let k = 0; k < nMoedas; k++) {
 		const a = math.random() * math.pi * 2;

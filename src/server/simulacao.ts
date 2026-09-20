@@ -49,6 +49,7 @@ function aplicarDungeon(d: DungeonPronta): void {
 	mundo.inimigos = [];
 	mundo.balas = [];
 	mundo.cots = [];
+	mundo.manchas = [];
 	mundo.bossVivo = false;
 	mundo.bossMorto = false;
 	mundo.tempo = 0;
@@ -77,6 +78,7 @@ function novaMasmorra(lobby: boolean): void {
 		mundo.inimigos = [];
 		mundo.balas = [];
 		mundo.cots = [];
+		mundo.manchas = [];
 		mundo.bossVivo = false;
 		mundo.bossMorto = false;
 		mundo.mapaIdx = 0;
@@ -99,6 +101,7 @@ function teleportarTodos(texto: string): void {
 		js.dirY = 0;
 		js.morto = false;
 		js.pausado = false;
+		js.flashT = 0;
 		js.hp = js.hpMax;
 		enviar(js.player, { tipo: "mapa", grade: gradeStrings(), seed: mundo.seed, lobby: mundo.modo === "lobby" });
 	}

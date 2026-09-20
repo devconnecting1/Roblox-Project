@@ -11,7 +11,10 @@
  */
 import { GuiService, Players, RunService, StarterGui, UserInputService, Workspace } from "@rbxts/services";
 import {
+	ALCANCE_CLARAO,
+	ALCANCE_LAMP,
 	CLASSES,
+	CONE_LAMP,
 	COR_TILE,
 	eSolido,
 	ITEM_POR_ID,
@@ -53,6 +56,7 @@ import { criarChat } from "./chat";
 interface EntFrame {
 	frame: Frame;
 	barra: Frame | undefined;
+	halo: Frame | undefined; // brilho que pulsa no clarão do disparo
 	rx: number;
 	ry: number;
 }
@@ -360,6 +364,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		fb.Visible = false;
 		fillBorda.push(fb);
 	}
+	// Decalques no chão (sangue verde + corpos): pool fixo, sem custo de criação
+	const decalques: Frame[] = [];
+	for (let k = 0; k < 200; k++) {
+		const dc = novoQuadro(arena, `Dec${k}`, new UDim2(0, 12, 0, 12), new UDim2(0, -500, 0, -500), COR_FUNDO, 0);
+		dc.ZIndex = 2;
+		dc.Visible = false;
+		decalques.push(dc);
+	}
 	const txtBossNome = novoTexto(
 		telaJogo,
 		"BossNome",
@@ -560,9 +572,14 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let camTileY = -1;
 	let nevoaTileX = -999;
 	let nevoaTileY = -999;
+	let nevoaFx = 1;
+	let nevoaFy = 0;
 
 	let framePlayer: Frame | undefined = undefined;
 	let olhoPlayer: Frame | undefined = undefined;
+	let haloPlayer1: Frame | undefined = undefined;
+	let haloPlayer2: Frame | undefined = undefined;
+	let hudFlashV = false;
 	let brilhoPlayer: Frame | undefined = undefined;
 	let placaVida: Frame | undefined = undefined;
 	let placaXp: Frame | undefined = undefined;
@@ -781,16 +798,21 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 
 	let expTX = -999;
 	let expTY = -999;
+	let expFx = 1;
+	let expFy = 0;
 
-	function marcarExplorado(): void {
+	function marcarExplorado(fx: number, fy: number, range: number, wide: boolean): void {
 		const pcx = math.floor(px / TILE);
 		const pcy = math.floor(py / TILE);
-		if (pcx === expTX && pcy === expTY) {
-			return; // parado no mesmo tile: nada novo para explorar
+		const mira = fx * expFx + fy * expFy;
+		if (pcx === expTX && pcy === expTY && mira > 0.995) {
+			return; // parado no mesmo tile e mesma mira: nada novo para explorar
 		}
 		expTX = pcx;
 		expTY = pcy;
-		const rr = math.ceil(VISAO / TILE);
+		expFx = fx;
+		expFy = fy;
+		const rr = math.ceil(range / TILE);
 		for (let ty = pcy - rr; ty <= pcy + rr; ty++) {
 			for (let tx = pcx - rr; tx <= pcx + rr; tx++) {
 				if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY) {
@@ -798,14 +820,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				}
 				const dx = (tx + 0.5) * TILE - px;
 				const dy = (ty + 0.5) * TILE - py;
-				if (dx * dx + dy * dy < VISAO * VISAO && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE)) {
+				const d2 = dx * dx + dy * dy;
+				if (d2 > range * range) {
+					continue;
+				}
+				const d = math.sqrt(d2);
+				if (!wide && d >= 1 && (dx * fx + dy * fy) / d < CONE_LAMP) {
+					continue; // fora do cone da lanterna: olho real não vê
+				}
+				if (haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE)) {
 					explorado[ty * MUNDO_TX + tx] = true;
 				}
 			}
 		}
 	}
 
-	function desenharTiles(): void {
+	function desenharTiles(fx: number, fy: number, range: number, wide: boolean): void {
 		const camada = camadaTiles;
 		if (camada === undefined || tilesCols === 0 || grade.size() === 0) {
 			return;
@@ -817,13 +847,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const pty = math.floor(py / TILE);
 		const mudouOrigem = tx0 !== camTileX || ty0 !== camTileY;
 		const mudouNevoa = ptx !== nevoaTileX || pty !== nevoaTileY;
-		if (!mudouOrigem && !mudouNevoa) {
-			return;
+		const mira = fx * nevoaFx + fy * nevoaFy;
+		if (!mudouOrigem && !mudouNevoa && mira > 0.995) {
+			return; // nada mudou (posição e mira iguais): pula o redesenho
 		}
 		camTileX = tx0;
 		camTileY = ty0;
 		nevoaTileX = ptx;
 		nevoaTileY = pty;
+		nevoaFx = fx;
+		nevoaFy = fy;
 		for (let i = 0; i < tiles.size(); i++) {
 			const tx = tx0 + (i % tilesCols);
 			const ty = ty0 + math.floor(i / tilesCols);
@@ -832,8 +865,11 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const ch = dentro ? charGrade(tx, ty) : "R";
 			const cx = (tx + 0.5) * TILE - px;
 			const cy = (ty + 0.5) * TILE - py;
-			const perto = cx * cx + cy * cy < VISAO * VISAO;
-			const vis = semFog ? dentro : perto && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
+			const d2 = cx * cx + cy * cy;
+			const d = math.sqrt(d2);
+			// Lanterna: alcance curto + SÓ no cone da mira (olho real não vê 360°)
+			const noCone = wide || d < 1 || ((cx * fx + cy * fy) / d >= CONE_LAMP && d < range);
+			const vis = semFog ? dentro : noCone && haVisada(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE);
 			const exp = dentro && explorado[ty * MUNDO_TX + tx];
 			if (!vis && !exp) {
 				t.frame.Visible = false; // inexplorado: some (fundo preto)
@@ -842,7 +878,12 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				continue;
 			}
 			const parede = ch === "R" || ch === "W";
-			const base = vis ? (COR_TILE[ch] ?? COR_TILE["G"]) : (COR_ESCURA[ch] ?? COR_DESCONHECIDO);
+			const baseCrua = vis ? (COR_TILE[ch] ?? COR_TILE["G"]) : (COR_ESCURA[ch] ?? COR_DESCONHECIDO);
+			// Luz real: apaga com a distância (só na dungeon; lobby fica claro)
+			const base =
+				vis && !semFog
+					? clarear(tomComJitter(baseCrua, tx, ty), 1 - (0.4 * d) / range)
+					: tomComJitter(baseCrua, tx, ty);
 			t.frame.Visible = true;
 			t.frame.BackgroundColor3 = tomComJitter(base, tx, ty);
 			const slotX = (i % tilesCols) * TILE;
@@ -1195,7 +1236,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				new UDim2(0, -11, 0, tam + 2),
 			);
 			rot.ZIndex = 9;
-			ent = { frame: f, barra: barra, rx: 0, ry: 0 };
+			ent = { frame: f, barra: barra, halo: undefined, rx: 0, ry: 0 };
 			entInimigos[id] = ent;
 			chavesInimigos.push(id);
 		}
@@ -1226,7 +1267,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			haloO.ZIndex = 8;
 			const rot = novoTexto(f, "Nome", nome, 10, COR_TEXTO, new UDim2(0, 60, 0, 12), new UDim2(0, -21, 0, -15));
 			rot.ZIndex = 11;
-			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
+			ent = { frame: f, barra: undefined, halo: haloO, rx: 0, ry: 0 };
 			entOutros[nome] = ent;
 			chavesOutros.push(nome);
 		}
@@ -1251,6 +1292,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			0.8,
 		);
 		halo1.ZIndex = 8;
+		haloPlayer1 = halo1;
 		const halo2 = novoQuadro(
 			p,
 			"Halo2",
@@ -1260,6 +1302,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			0.9,
 		);
 		halo2.ZIndex = 7;
+		haloPlayer2 = halo2;
 		const olho = novoQuadro(p, "Olho", new UDim2(0, 6, 0, 6), new UDim2(0, 11, 0, 7), COR_TEXTO, 0);
 		olho.ZIndex = 11;
 		const brilho = novoQuadro(
@@ -1359,10 +1402,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			t.linhaH.Visible = false;
 			t.linhaV.Visible = false;
 		}
+		for (const dc of decalques) {
+			dc.Visible = false;
+		}
 		if (framePlayer !== undefined) {
 			framePlayer.Destroy();
 			framePlayer = undefined;
 			olhoPlayer = undefined;
+			haloPlayer1 = undefined;
+			haloPlayer2 = undefined;
+			hudFlashV = false;
 			brilhoPlayer = undefined;
 			placaVida = undefined;
 			placaXp = undefined;
@@ -1403,7 +1452,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				0,
 			);
 			f.ZIndex = 7;
-			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
+			ent = { frame: f, barra: undefined, halo: undefined, rx: 0, ry: 0 };
 			entBalas[id] = ent;
 			chavesBalas.push(id);
 		}
@@ -1423,7 +1472,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			);
 			f.ZIndex = 5;
 			borda(f, Color3.fromRGB(10, 10, 10), 1);
-			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
+			ent = { frame: f, barra: undefined, halo: undefined, rx: 0, ry: 0 };
 			entCots[id] = ent;
 			chavesCots.push(id);
 		}
@@ -1889,12 +1938,30 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			camX += (alvoX - camX) * k;
 			camY += (alvoY - camY) * k;
 		}
+		// Lanterna: alcance curto + cone na mira do mouse (clarão = 360° breve)
+		const lampRange = foto.flash ? ALCANCE_CLARAO : ALCANCE_LAMP;
+		const lampWide = foto.flash || semFog;
+		const lampFx = semFog ? 1 : foto.fx;
+		const lampFy = semFog ? 0 : foto.fy;
 		debug.profilebegin("PQ_Explorado");
-		marcarExplorado();
+		marcarExplorado(lampFx, lampFy, semFog ? VISAO : lampRange, lampWide);
 		debug.profileend();
 		debug.profilebegin("PQ_Tiles");
-		desenharTiles();
+		desenharTiles(lampFx, lampFy, lampRange, lampWide);
 		debug.profileend();
+		// Sangue verde e corpos no chão (só o iluminado desce no snapshot)
+		for (let k = 0; k < decalques.size(); k++) {
+			const dc = decalques[k];
+			if (k < foto.manchas.size()) {
+				const m = foto.manchas[k];
+				dc.Size = new UDim2(0, m.tam, 0, m.tam);
+				dc.Position = new UDim2(0, tX(m.x) - m.tam / 2, 0, tY(m.y) - m.tam / 2);
+				dc.BackgroundColor3 = new Color3(m.r / 255, m.g / 255, m.b / 255);
+				dc.Visible = true;
+			} else if (dc.Visible) {
+				dc.Visible = false;
+			}
+		}
 
 		// Zonas do lobby: ficar 3s no selo preenche a borda e abre (sair cancela)
 		if (foto.lobby) {
@@ -1965,6 +2032,16 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				plNv = foto.nivel;
 				placaNv.Text = `Nv ${foto.nivel}`;
 			}
+			// Clarão do disparo: halo pulsa junto com a luz
+			if (foto.flash !== hudFlashV) {
+				hudFlashV = foto.flash;
+				if (haloPlayer1 !== undefined) {
+					haloPlayer1.BackgroundTransparency = foto.flash ? 0.45 : 0.8;
+				}
+				if (haloPlayer2 !== undefined) {
+					haloPlayer2.BackgroundTransparency = foto.flash ? 0.6 : 0.9;
+				}
+			}
 			let nomeTitulo = "";
 			if (foto.tituloEq !== "") {
 				for (const t of TITULOS) {
@@ -2023,6 +2100,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			suavizar(ent, j.x, j.y, dt);
 			ent.frame.Position = new UDim2(0, tX(ent.rx) - 9, 0, tY(ent.ry) - 9);
 			ent.frame.Visible = true;
+			if (ent.halo !== undefined) {
+				ent.halo.BackgroundTransparency = j.flash ? 0.45 : 0.82;
+			}
 		}
 		for (const nome of chavesOutros) {
 			if (!nomesVistos[nome]) {
