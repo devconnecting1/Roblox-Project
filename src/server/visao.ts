@@ -42,6 +42,7 @@ export function alertarAliados(px: number, py: number, excetoId: number): void {
 		}
 		// Aliado "escuta" se está a até 420px do avistamento
 		if (dist2(a.x, a.y, px, py) < 420 * 420) {
+			a.dormindo = false; // barulho acorda zumbi dormente
 			a.estado = "cacar";
 			a.vistoX = px;
 			a.vistoY = py;

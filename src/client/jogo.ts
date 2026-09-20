@@ -363,7 +363,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	const txtBossNome = novoTexto(
 		telaJogo,
 		"BossNome",
-		"Sereia da Praia",
+		"Rei Zumbi",
 		13,
 		COR_TEXTO,
 		new UDim2(0, 300, 0, 18),
@@ -895,12 +895,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		for (let i = 0; i < MAPAS.size(); i++) {
 			const m = MAPAS[i];
 			const c = cardsMapa[i];
+			const livre = i <= 1 && nivelContaLocal() >= m.reqNivel;
 			if (i === 0) {
 				c.head.Text = `MAPA ${i + 1}`;
 				c.head.TextColor3 = COR_TEXTO;
 				c.mid.Text = m.nome;
 				c.mid.TextColor3 = COR_TEXTO;
 				c.foot.Text = "5 ÁREAS • BOSS";
+				c.btn.BackgroundColor3 = Color3.fromRGB(45, 52, 66);
+				c.lockCorpo.Visible = false;
+				c.lockArco.Visible = false;
+			} else if (livre) {
+				c.head.Text = `MAPA ${i + 1}`;
+				c.head.TextColor3 = COR_TEXTO;
+				c.mid.Text = m.nome;
+				c.mid.TextColor3 = COR_TEXTO;
+				c.foot.Text = "SALÃO + 6 SALAS • EXTERMÍNIO";
 				c.btn.BackgroundColor3 = Color3.fromRGB(45, 52, 66);
 				c.lockCorpo.Visible = false;
 				c.lockArco.Visible = false;
@@ -921,6 +931,9 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const m = MAPAS[slotSel];
 		if (slotSel === 0) {
 			txtCartaSel.Text = `MAPA 1 — ${m.nome}`;
+			txtCartaSel.TextColor3 = COR_TEXTO;
+		} else if (slotSel === 1 && nivelContaLocal() >= m.reqNivel) {
+			txtCartaSel.Text = `MAPA 2 — ${m.nome}`;
 			txtCartaSel.TextColor3 = COR_TEXTO;
 		} else {
 			txtCartaSel.Text = `MAPA ${slotSel + 1} — Nv ${m.reqNivel} • EM BREVE`;
@@ -1038,7 +1051,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const idx = i;
 		cardsMapa[idx].btn.Activated.Connect(() => {
 			if (idx === slotSel) {
-				if (idx === 0) {
+				if (idx <= 1 && nivelContaLocal() >= MAPAS[idx].reqNivel) {
 					entrarNoMapa(idx);
 				} else {
 					avisoMapas.Text = `MAPA ${idx + 1} bloqueado: Nv ${MAPAS[idx].reqNivel} (conta) — em breve!`;
@@ -2076,7 +2089,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			hudMoedas = foto.moedas;
 			txtMoedas.Text = `$ ${foto.moedas}`;
 		}
-		const ondaTxt = foto.lobby ? "LOBBY" : foto.bossFracao >= 0 ? "BOSS!" : `ÁREA ${foto.area + 1}`;
+		const ondaTxt = foto.lobby
+			? "LOBBY"
+			: foto.mapaIdx === 1
+				? "HOSPITAL"
+				: foto.bossFracao >= 0
+					? "BOSS!"
+					: `ÁREA ${foto.area + 1}`;
 		if (ondaTxt !== hudOnda) {
 			hudOnda = ondaTxt;
 			txtOnda.Text = ondaTxt;

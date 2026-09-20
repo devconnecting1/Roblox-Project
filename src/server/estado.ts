@@ -23,6 +23,7 @@ export interface InimigoS {
 	danoBala: number;
 	tiroT: number;
 	rajadaT: number;
+	dormindo: boolean; // zumbi dormente: espera até barulho/proximidade (estilo WWZ)
 	nv: number; // nível = área + 1 (exibido abaixo do inimigo)
 	// Sentidos: visão com paredes, memória e caça em equipe
 	estado: EstadoInimigo;
@@ -104,6 +105,8 @@ export interface JogadorS {
 interface Mundo {
 	ativo: boolean;
 	modo: "lobby" | "dungeon"; // um mundo por servidor (party fica junta)
+	mapaIdx: number; // 0 = masmorra, 1 = hospital
+	hospTotal: number; // zumbis gerados no hospital (vitória = zerar)
 	portas: Porta[];
 	nasc: [number, number];
 	areasLimpas: boolean[];
@@ -123,6 +126,8 @@ interface Mundo {
 export const mundo: Mundo = {
 	ativo: false,
 	modo: "lobby",
+	mapaIdx: 0,
+	hospTotal: 0,
 	portas: [],
 	nasc: [MUNDO_L / 2, MUNDO_A / 2],
 	areasLimpas: [false, false, false, false, false],

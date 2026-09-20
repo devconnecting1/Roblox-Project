@@ -11,15 +11,16 @@
  * `projeteis` ← este orquestrador (`novaMasmorra`, `escolherMapa`, `atualizar`).
  */
 import { MAPAS } from "shared/pixelquest/Dados";
-import { Porta, acharChaoPerto, definirGrade, gerarLobby, gerarMundo, gradeStrings } from "./mundo";
+import { Porta, acharChaoPerto, definirGrade, gerarHospital, gerarLobby, gerarMundo, gradeStrings } from "./mundo";
 import { garantirLeaderstats, mundo, nivelConta } from "./estado";
-import { atualizarCots, atualizarJogadores, novoJogador } from "./jogadores";
+import { atualizarCots, atualizarJogadores, fimRun, novoJogador } from "./jogadores";
 import { titulosSalvos } from "./save";
-import { atualizarInimigos, spawnPack } from "./inimigos";
+import { atualizarInimigos, spawnHospital, spawnPack } from "./inimigos";
 import { atualizarBalas } from "./projeteis";
 import { difundir, enviar, enviarSnapshots } from "./foto";
 
 interface DungeonPronta {
+	mapa: number;
 	portas: Porta[];
 	nasc: [number, number];
 	seed: number;
@@ -29,14 +30,15 @@ interface DungeonPronta {
 // Próxima dungeon pré-gerada na vitória (DeNovo instantâneo, sem travar a party)
 let staging: DungeonPronta | undefined = undefined;
 
-function prepararDungeon(): DungeonPronta {
-	const gen = gerarMundo();
+function prepararDungeon(mapa: number): DungeonPronta {
+	const gen = mapa === 1 ? gerarHospital() : gerarMundo();
 	const seed = math.random(1, 999999);
 	math.randomseed(seed);
-	return { portas: gen.portas, nasc: gen.nasc, seed: seed, linhas: gradeStrings() };
+	return { mapa: mapa, portas: gen.portas, nasc: gen.nasc, seed: seed, linhas: gradeStrings() };
 }
 
 function aplicarDungeon(d: DungeonPronta): void {
+	mundo.mapaIdx = d.mapa;
 	mundo.portas = d.portas;
 	mundo.nasc = d.nasc;
 	mundo.modo = "dungeon";
@@ -51,9 +53,16 @@ function aplicarDungeon(d: DungeonPronta): void {
 	mundo.bossMorto = false;
 	mundo.tempo = 0;
 	mundo.ativo = true;
-	// Só a área 0 nasce com a masmorra; as demais surgem ao liberar a anterior
-	spawnPack(0);
-	print(`[PixelQuest] Masmorra gerada: ${mundo.inimigos.size()} inimigos, ${mundo.portas.size()} portas.`);
+	if (d.mapa === 1) {
+		mundo.hospTotal = 0;
+		spawnHospital(); // hospital: horda inteira dormente de uma vez
+		print(`[PixelQuest] Hospital gerado: ${mundo.inimigos.size()} zumbis.`);
+	} else {
+		mundo.hospTotal = 0;
+		// Só a área 0 nasce com a masmorra; as demais surgem ao liberar a anterior
+		spawnPack(0);
+		print(`[PixelQuest] Masmorra gerada: ${mundo.inimigos.size()} inimigos, ${mundo.portas.size()} portas.`);
+	}
 }
 
 function novaMasmorra(lobby: boolean): void {
@@ -70,11 +79,13 @@ function novaMasmorra(lobby: boolean): void {
 		mundo.cots = [];
 		mundo.bossVivo = false;
 		mundo.bossMorto = false;
+		mundo.mapaIdx = 0;
+		mundo.hospTotal = 0;
 		mundo.tempo = 0;
 		mundo.ativo = true;
 		print("[PixelQuest] Lobby gerado.");
 	} else {
-		aplicarDungeon(prepararDungeon());
+		aplicarDungeon(prepararDungeon(0));
 	}
 }
 
@@ -109,24 +120,25 @@ function spawnJogadorEm(player: Player, nasc: [number, number]): void {
 
 /** Entrada na run (validação de mapa/nível é anti-cheat de verdade). */
 export function escolherMapa(player: Player, mapa: number): void {
-	if (mapa !== 0) {
-		return; // só o Mapa 1 existe por enquanto
+	if (mapa < 0 || mapa > 1) {
+		return; // só Masmorra (0) e Hospital (1) existem por enquanto
 	}
 	if (mapa >= MAPAS.size() || nivelConta(player) < MAPAS[mapa].reqNivel) {
 		return;
 	}
-	consumirStaging();
-	teleportarTodos(`${player.Name} iniciou a run!`);
+	consumirStaging(mapa);
+	teleportarTodos(mapa === 1 ? `${player.Name} invadiu o hospital!` : `${player.Name} iniciou a run!`);
 	print(`[PixelQuest] ${player.Name} escolheu o mapa ${mapa} (party junto).`);
 }
 
-function consumirStaging(): void {
-	if (staging !== undefined) {
+function consumirStaging(mapa: number): void {
+	if (staging !== undefined && staging.mapa === mapa) {
 		const d = staging;
 		staging = undefined;
 		aplicarDungeon(d);
 	} else {
-		novaMasmorra(false);
+		staging = undefined;
+		aplicarDungeon(prepararDungeon(mapa));
 	}
 }
 
@@ -154,7 +166,24 @@ export function atualizar(dt: number): void {
 	}
 	mundo.tempo += dt;
 	if (mundo.bossMorto && staging === undefined) {
-		staging = prepararDungeon(); // vitória: próxima run já nasce pronta
+		staging = prepararDungeon(0); // vitória: próxima run já nasce pronta
+	}
+	// Hospital: matou todos os zumbis = vitória (sem portas/boss aqui)
+	if (
+		mundo.modo === "dungeon" &&
+		mundo.mapaIdx === 1 &&
+		mundo.hospTotal > 0 &&
+		mundo.vivosPorArea[0] <= 0 &&
+		staging === undefined
+	) {
+		staging = prepararDungeon(1);
+		for (const [, outro] of mundo.jogadores) {
+			if (!outro.morto) {
+				fimRun(outro, true);
+			}
+		}
+		difundir({ tipo: "banner", texto: "HOSPITAL LIMPO! Nenhum zumbi restou.", duracao: 3 });
+		print("[PixelQuest] Hospital limpo: vitória da party.");
 	}
 	atualizarJogadores(dt);
 	atualizarInimigos(dt);

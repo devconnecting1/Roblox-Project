@@ -13,7 +13,7 @@ import {
 	LOOT_COMUM,
 	tiposPorArea,
 } from "shared/pixelquest/Dados";
-import { abrirPorta, areaDe, areaSolida, chaoNaArea } from "./mundo";
+import { abrirPorta, areaDe, areaSolida, chaoEmRet, chaoNaArea } from "./mundo";
 import { InimigoS, JogadorS, dist2, empurrarBala, mundo } from "./estado";
 import { ALCANCE_VISAO, alertarAliados, temVisada } from "./visao";
 import { checarQuest, darItem, ferirJogador, fimRun, ganharXp } from "./jogadores";
@@ -36,6 +36,7 @@ function nascerInimigo(info: InimigoInfo, boss: boolean, area: number, x: number
 		danoBala: info.danoBala + area,
 		tiroT: 1 + math.random(),
 		rajadaT: 2,
+		dormindo: !boss, // zumbis nascem dormentes (WWZ); boss já acorda caçando
 		estado: "patrulha",
 		alvo: undefined,
 		vistoX: x,
@@ -69,8 +70,37 @@ function spawnBoss(): void {
 	}
 	nascerInimigo(BOSS, true, 4, pos[0], pos[1]);
 	mundo.bossVivo = true;
-	difundir({ tipo: "banner", texto: "SEREIA DA PRAIA!", duracao: 3 });
+	difundir({ tipo: "banner", texto: "REI ZUMBI!", duracao: 3 });
 	print("[PixelQuest] Boss nasceu.");
+}
+
+/** Horda do hospital: salão + enfermarias cheios de zumbis dormentes. */
+export function spawnHospital(): void {
+	// [x0, y0, x1, y1, quantidade]: salão central + 6 enfermarias
+	const regioes: [number, number, number, number, number][] = [
+		[23, 23, 36, 36, 30],
+		[15, 9, 21, 14, 10],
+		[39, 9, 45, 14, 10],
+		[7, 23, 13, 28, 10],
+		[47, 23, 53, 28, 10],
+		[15, 45, 21, 50, 10],
+		[39, 45, 45, 50, 10],
+	];
+	let gerados = 0;
+	for (const r of regioes) {
+		for (let k = 0; k < r[4]; k++) {
+			const pos = chaoEmRet(r[0], r[1], r[2], r[3], 20);
+			if (pos === undefined) {
+				continue;
+			}
+			const s = math.random();
+			const tipo = s < 0.7 ? 0 : s < 0.9 ? 1 : 2;
+			nascerInimigo(INIMIGOS[tipo], false, 0, pos[0], pos[1]);
+			gerados++;
+		}
+	}
+	mundo.hospTotal = gerados;
+	print(`[PixelQuest] Hospital gerado: ${gerados} zumbis dormentes.`);
 }
 
 export function matarInimigo(idx: number, assassino: JogadorS): void {
@@ -115,7 +145,7 @@ export function matarInimigo(idx: number, assassino: JogadorS): void {
 				fimRun(outro, true);
 			}
 		}
-	} else if (e.area < 4) {
+	} else if (mundo.mapaIdx === 0 && e.area < 4) {
 		// Área limpa? Abre as portas E povoa a próxima (áreas trancadas não têm inimigos)
 		if (!mundo.areasLimpas[e.area] && mundo.vivosPorArea[e.area] <= 0) {
 			mundo.areasLimpas[e.area] = true;
@@ -134,12 +164,13 @@ export function matarInimigo(idx: number, assassino: JogadorS): void {
 }
 
 export function atualizarInimigos(dt: number): void {
-	// Boss entra quando alguém pisa na área 4 (só na dungeon; lobby não tem boss)
+	// Boss entra quando alguém pisa na área 4 (só na masmorra; hospital não tem boss)
 	for (const [, js] of mundo.jogadores) {
 		if (
 			!js.morto &&
 			!js.pausado &&
 			mundo.modo === "dungeon" &&
+			mundo.mapaIdx === 0 &&
 			!mundo.bossVivo &&
 			!mundo.bossMorto &&
 			areaDe(js.x) === 4
@@ -152,6 +183,30 @@ export function atualizarInimigos(dt: number): void {
 	debug.profilebegin("PQ_Inimigos");
 	for (let i = mundo.inimigos.size() - 1; i >= 0; i--) {
 		const e = mundo.inimigos[i];
+		// 0. Dormente (WWZ): parado até barulho/proximidade acordar
+		if (e.dormindo) {
+			let perto: JogadorS | undefined = undefined;
+			let pertoD = 260 * 260;
+			for (const [, js] of mundo.jogadores) {
+				if (js.morto || js.pausado) {
+					continue;
+				}
+				const dd = dist2(e.x, e.y, js.x, js.y);
+				if (dd < pertoD) {
+					pertoD = dd;
+					perto = js;
+				}
+			}
+			if (perto !== undefined) {
+				e.dormindo = false;
+				e.estado = "perseguir";
+				e.alvo = perto;
+				e.vistoX = perto.x;
+				e.vistoY = perto.y;
+				alertarAliados(perto.x, perto.y, e.id);
+			}
+			continue;
+		}
 		// 1. Tenta avistar (vivo mais próximo, com linha de visão)
 		let avistado: JogadorS | undefined = undefined;
 		let avistD = ALCANCE_VISAO * ALCANCE_VISAO;
@@ -292,30 +347,11 @@ export function atualizarInimigos(dt: number): void {
 				e.tiroT = e.info.cadenciaTiro + math.random() * 0.6;
 			}
 		}
-		if (e.rajadaT > 0) {
-			e.rajadaT -= dt;
-		}
-		if (e.boss && e.estado === "perseguir" && e.rajadaT <= 0) {
-			for (let k = 0; k < 12; k++) {
-				const a = (k / 12) * math.pi * 2 + mundo.tempo;
-				empurrarBala({
-					x: e.x,
-					y: e.y,
-					vx: math.cos(a) * 110,
-					vy: math.sin(a) * 110,
-					vida: 3.5,
-					dano: e.danoBala,
-					amiga: false,
-					tam: 9,
-				});
-			}
-			e.rajadaT = 1.9;
-		}
 	}
 
 	debug.profileend(); // PQ_Inimigos
-	// Separação leve anti-empilhamento
-	if (mundo.inimigos.size() <= 30) {
+	// Separação leve anti-empilhamento (hordas WWZ se apertam, mas não fundem)
+	if (mundo.inimigos.size() <= 80) {
 		for (let i = 0; i < mundo.inimigos.size(); i++) {
 			for (let j = i + 1; j < mundo.inimigos.size(); j++) {
 				const a = mundo.inimigos[i];

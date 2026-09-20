@@ -47,7 +47,7 @@ export interface MapaInfo {
 
 export const MAPAS: MapaInfo[] = [
 	{ nome: "Masmorra Inicial", descricao: "Dungeon crawler para todos.", reqNivel: 1 },
-	{ nome: "???", descricao: "Em breve.", reqNivel: 10 },
+	{ nome: "Hospital Abandonado", descricao: "Salão central + enfermarias. Extermine todos os zumbis.", reqNivel: 2 },
 	{ nome: "???", descricao: "Em breve.", reqNivel: 20 },
 	{ nome: "???", descricao: "Em breve.", reqNivel: 30 },
 	{ nome: "???", descricao: "Em breve.", reqNivel: 40 },
@@ -71,8 +71,8 @@ export const CLASSES: ClasseInfo[] = [
 		nome: "Aventureiro",
 		descricao: "Equilibrado e corajoso. Pronto para a masmorra.",
 		hpMax: 42,
-		dano: 5, // metralhadora: balas rápidas e fracas (DPS ~45)
-		cadencia: 0.11,
+		dano: 3, // metralhadora: balas frenéticas e fracas (DPS ~50)
+		cadencia: 0.06,
 		velTiro: 460,
 		velocidade: 185,
 		cor: Color3.fromRGB(231, 76, 60),
@@ -150,7 +150,7 @@ export const LOOT_BOSS: ItemInfo[] = [
 		slot: "arma",
 		dano: 6,
 		hp: 0,
-		descricao: "+6 de dano. Loot da Sereia.",
+		descricao: "+6 de dano. Loot do Rei Zumbi.",
 		preco: 30,
 	},
 	{
@@ -159,7 +159,7 @@ export const LOOT_BOSS: ItemInfo[] = [
 		slot: "armadura",
 		dano: 0,
 		hp: 20,
-		descricao: "+20 de HP máx. Loot da Sereia.",
+		descricao: "+20 de HP máx. Loot do Rei Zumbi.",
 		preco: 30,
 	},
 ];
@@ -199,14 +199,14 @@ export interface InimigoInfo {
 
 export const INIMIGOS: InimigoInfo[] = [
 	{
-		nome: "Zumbi de Alga",
-		hp: 26,
-		danoContato: 6,
-		velocidade: 70,
+		nome: "Zumbi",
+		hp: 34,
+		danoContato: 7,
+		velocidade: 85,
 		xp: 8,
 		moedaMin: 1,
 		moedaMax: 3,
-		cor: Color3.fromRGB(46, 139, 87),
+		cor: Color3.fromRGB(60, 140, 70),
 		tamanho: 22,
 		atira: false,
 		cadenciaTiro: 0,
@@ -215,46 +215,14 @@ export const INIMIGOS: InimigoInfo[] = [
 		tiros: 1,
 	},
 	{
-		nome: "Papagaio Tropical",
-		hp: 18,
-		danoContato: 4,
-		velocidade: 122,
-		xp: 6,
-		moedaMin: 1,
-		moedaMax: 2,
-		cor: Color3.fromRGB(241, 196, 15),
-		tamanho: 18,
-		atira: false,
-		cadenciaTiro: 0,
-		velBala: 0,
-		danoBala: 0,
-		tiros: 1,
-	},
-	{
-		nome: "Marinheiro",
-		hp: 48,
-		danoContato: 8,
-		velocidade: 62,
-		xp: 12,
-		moedaMin: 2,
-		moedaMax: 4,
-		cor: Color3.fromRGB(52, 152, 219),
-		tamanho: 24,
-		atira: true,
-		cadenciaTiro: 1.1,
-		velBala: 170,
-		danoBala: 5,
-		tiros: 1,
-	},
-	{
-		nome: "Caranguejo Apressado",
-		hp: 22,
+		nome: "Zumbi Corredor",
+		hp: 20,
 		danoContato: 6,
 		velocidade: 150,
 		xp: 10,
 		moedaMin: 1,
 		moedaMax: 3,
-		cor: Color3.fromRGB(210, 110, 40),
+		cor: Color3.fromRGB(180, 70, 60),
 		tamanho: 20,
 		atira: false,
 		cadenciaTiro: 0,
@@ -263,31 +231,15 @@ export const INIMIGOS: InimigoInfo[] = [
 		tiros: 1,
 	},
 	{
-		nome: "Água-Viva",
-		hp: 26,
-		danoContato: 5,
+		nome: "Zumbi Brutamontes",
+		hp: 130,
+		danoContato: 13,
 		velocidade: 55,
-		xp: 12,
-		moedaMin: 2,
-		moedaMax: 4,
-		cor: Color3.fromRGB(255, 130, 190),
-		tamanho: 22,
-		atira: true,
-		cadenciaTiro: 1.6,
-		velBala: 140,
-		danoBala: 4,
-		tiros: 3,
-	},
-	{
-		nome: "Tubarão",
-		hp: 40,
-		danoContato: 10,
-		velocidade: 170,
-		xp: 16,
-		moedaMin: 2,
-		moedaMax: 5,
-		cor: Color3.fromRGB(120, 140, 170),
-		tamanho: 26,
+		xp: 25,
+		moedaMin: 3,
+		moedaMax: 6,
+		cor: Color3.fromRGB(100, 90, 160),
+		tamanho: 28,
 		atira: false,
 		cadenciaTiro: 0,
 		velBala: 0,
@@ -297,35 +249,35 @@ export const INIMIGOS: InimigoInfo[] = [
 ];
 
 export const BOSS: InimigoInfo = {
-	nome: "Sereia da Praia",
-	hp: 340,
-	danoContato: 12,
-	velocidade: 55,
-	xp: 100,
-	moedaMin: 15,
-	moedaMax: 25,
-	cor: Color3.fromRGB(155, 89, 182),
-	tamanho: 40,
-	atira: true,
-	cadenciaTiro: 0.8,
-	velBala: 145,
-	danoBala: 7,
-	tiros: 3,
+	nome: "Rei Zumbi",
+	hp: 500,
+	danoContato: 16,
+	velocidade: 70,
+	xp: 150,
+	moedaMin: 20,
+	moedaMax: 35,
+	cor: Color3.fromRGB(139, 90, 180),
+	tamanho: 44,
+	atira: false,
+	cadenciaTiro: 0,
+	velBala: 0,
+	danoBala: 0,
+	tiros: 1,
 };
 
-/** Inimigos por área (0–3; área 4 = boss). Nascem ao liberar a área. */
-export const INIMIGOS_POR_AREA: number[] = [7, 8, 9, 10];
+/** Inimigos por área (0–3; área 4 = boss). Hordas estilo WWZ. */
+export const INIMIGOS_POR_AREA: number[] = [26, 30, 34, 38];
 
 /** Tipos desbloqueados por área (índices em INIMIGOS). */
 export function tiposPorArea(area: number): number[] {
 	if (area < 1) {
 		return [0];
 	} else if (area < 2) {
-		return [0, 1, 3];
+		return [0, 0, 1];
 	} else if (area < 3) {
-		return [0, 1, 2, 3, 4];
+		return [0, 1, 1, 2];
 	}
-	return [1, 2, 3, 4, 5];
+	return [0, 1, 2, 2];
 }
 
 // ---------- Quests (estilo "Derrote 11...") ----------
@@ -362,8 +314,8 @@ export const QUESTS: QuestInfo[] = [
 	},
 	{
 		id: "recompensa",
-		nome: "Recompensa: Sereia",
-		descricao: "Derrote a Sereia da Praia",
+		nome: "Recompensa: Rei Zumbi",
+		descricao: "Derrote o Rei Zumbi",
 		meta: 1,
 		xp: 100,
 		valor: 20,
@@ -473,6 +425,7 @@ export interface Foto {
 	pausado: boolean;
 	areasAbertas: number; // bitmask das áreas liberadas
 	lobby: boolean; // mundo atual é o lobby (sem inimigos/boss)
+	mapaIdx: number; // 0 = masmorra, 1 = hospital
 }
 
 export type EventoPayload =

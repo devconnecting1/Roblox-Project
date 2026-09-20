@@ -22,6 +22,7 @@ export function atualizarBalas(dt: number): void {
 					const rr = b.tam / 2 + e.info.tamanho / 2;
 					if (dist2(b.x, b.y, e.x, e.y) < rr * rr) {
 						e.hp -= b.dano;
+						e.dormindo = false; // tiro acorda o zumbi
 						morta = true;
 						if (e.hp <= 0) {
 							// assassino = jogador vivo mais próximo do abate

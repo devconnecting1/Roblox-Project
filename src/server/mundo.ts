@@ -193,7 +193,67 @@ export function gerarLobby(): { portas: Porta[]; nasc: [number, number] } {
 	return { portas: portas, nasc: nasc };
 }
 
-/** Tile atual (fora da grade = parede). */
+/** Gera o hospital (mapa 2: salão central + 6 enfermarias, sem portas). */
+export function gerarHospital(): { portas: Porta[]; nasc: [number, number] } {
+	grade = [];
+	for (let ty = 0; ty < MUNDO_TY; ty++) {
+		const linha: string[] = [];
+		for (let tx = 0; tx < MUNDO_TX; tx++) {
+			linha.push("R");
+		}
+		grade.push(linha);
+	}
+	portas = [];
+	const cavarSala = (x: number, y: number, w: number, h: number): void => {
+		for (let yy = y; yy < y + h; yy++) {
+			for (let xx = x; xx < x + w; xx++) {
+				porChao(xx, yy);
+			}
+		}
+	};
+	cavarSala(22, 22, 16, 16); // salão central
+	cavarSala(14, 8, 8, 8); // enfermaria N1
+	cavarSala(38, 8, 8, 8); // enfermaria N2
+	cavarSala(6, 22, 8, 8); // enfermaria W
+	cavarSala(46, 22, 8, 8); // enfermaria E
+	cavarSala(14, 44, 8, 8); // enfermaria S1
+	cavarSala(38, 44, 8, 8); // enfermaria S2
+	// Corredores abertos (2 de largura, sem portas)
+	escavarV(17, 15, 22);
+	escavarV(40, 15, 22);
+	escavarH(25, 13, 22, undefined, undefined);
+	escavarH(25, 37, 46, undefined, undefined);
+	escavarV(17, 37, 44);
+	escavarV(40, 37, 44);
+	// Decoração: musgo no chão
+	for (let ty = 2; ty < MUNDO_TY - 2; ty++) {
+		for (let tx = 2; tx < MUNDO_TX - 2; tx++) {
+			if (grade[ty][tx] === "." && math.random() < 0.1) {
+				grade[ty][tx] = "*";
+			}
+		}
+	}
+	nasc = [29.5 * TILE, 29.5 * TILE];
+	return { portas: portas, nasc: nasc };
+}
+
+/** Ponto caminhável aleatório dentro de um retângulo de tiles (spawn do hospital). */
+export function chaoEmRet(
+	x0t: number,
+	y0t: number,
+	x1t: number,
+	y1t: number,
+	raio: number,
+): [number, number] | undefined {
+	for (let t = 0; t < 40; t++) {
+		const x = (x0t + math.random() * (x1t - x0t)) * TILE;
+		const y = (y0t + math.random() * (y1t - y0t)) * TILE;
+		if (!areaSolida(x, y, raio)) {
+			return [x, y];
+		}
+	}
+	return undefined;
+}
 export function lerTile(tx: number, ty: number): string {
 	if (tx < 0 || ty < 0 || tx >= MUNDO_TX || ty >= MUNDO_TY || grade.size() === 0) {
 		return "R";
