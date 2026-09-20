@@ -193,7 +193,7 @@ export function gerarLobby(): { portas: Porta[]; nasc: [number, number] } {
 	return { portas: portas, nasc: nasc };
 }
 
-/** Gera o hospital (mapa 2: salão central + 6 enfermarias, sem portas). */
+/** Gera o hospital (mapa 2: salão central + 12 enfermarias interligadas). */
 export function gerarHospital(): { portas: Porta[]; nasc: [number, number] } {
 	grade = [];
 	for (let ty = 0; ty < MUNDO_TY; ty++) {
@@ -212,19 +212,33 @@ export function gerarHospital(): { portas: Porta[]; nasc: [number, number] } {
 		}
 	};
 	cavarSala(22, 22, 16, 16); // salão central
-	cavarSala(14, 8, 8, 8); // enfermaria N1
-	cavarSala(38, 8, 8, 8); // enfermaria N2
-	cavarSala(6, 22, 8, 8); // enfermaria W
-	cavarSala(46, 22, 8, 8); // enfermaria E
-	cavarSala(14, 44, 8, 8); // enfermaria S1
-	cavarSala(38, 44, 8, 8); // enfermaria S2
-	// Corredores abertos (2 de largura, sem portas)
-	escavarV(17, 15, 22);
-	escavarV(40, 15, 22);
-	escavarH(25, 13, 22, undefined, undefined);
-	escavarH(25, 37, 46, undefined, undefined);
-	escavarV(17, 37, 44);
-	escavarV(40, 37, 44);
+	cavarSala(6, 8, 8, 8); // N1
+	cavarSala(18, 8, 8, 8); // N2
+	cavarSala(34, 8, 8, 8); // N3
+	cavarSala(46, 8, 8, 8); // N4
+	cavarSala(6, 22, 8, 8); // W1
+	cavarSala(6, 34, 8, 8); // W2
+	cavarSala(46, 22, 8, 8); // E1
+	cavarSala(46, 34, 8, 8); // E2
+	cavarSala(6, 44, 8, 8); // S1
+	cavarSala(18, 44, 8, 8); // S2
+	cavarSala(34, 44, 8, 8); // S3
+	cavarSala(46, 44, 8, 8); // S4
+	// Corredores abertos (2 de largura, sem portas): salas vizinhas ligam entre si
+	escavarH(11, 13, 18, undefined, undefined); // N1↔N2
+	escavarV(21, 15, 22); // N2↔salão
+	escavarV(37, 15, 22); // N3↔salão
+	escavarV(49, 15, 22); // N4↔E1
+	escavarH(25, 13, 22, undefined, undefined); // W1↔salão
+	escavarH(25, 37, 46, undefined, undefined); // salão↔E1
+	escavarV(9, 29, 34); // W1↔W2
+	escavarV(49, 29, 34); // E1↔E2
+	escavarH(47, 13, 18, undefined, undefined); // S1↔S2
+	escavarH(47, 41, 46, undefined, undefined); // S3↔S4
+	escavarV(21, 37, 44); // salão↔S2
+	escavarV(37, 37, 44); // salão↔S3
+	escavarV(9, 41, 44); // W2↔S1
+	escavarV(49, 41, 44); // E2↔S4
 	// Decoração: musgo no chão
 	for (let ty = 2; ty < MUNDO_TY - 2; ty++) {
 		for (let tx = 2; tx < MUNDO_TX - 2; tx++) {

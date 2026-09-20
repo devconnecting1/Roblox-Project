@@ -74,17 +74,23 @@ function spawnBoss(): void {
 	print("[PixelQuest] Boss nasceu.");
 }
 
-/** Horda do hospital: salão + enfermarias cheios de zumbis dormentes. */
+/** Horda do hospital: salão + 12 enfermarias cheios de zumbis dormentes. */
 export function spawnHospital(): void {
-	// [x0, y0, x1, y1, quantidade]: salão central + 6 enfermarias
+	// [x0, y0, x1, y1, quantidade]: salão central + 12 enfermarias
 	const regioes: [number, number, number, number, number][] = [
 		[23, 23, 36, 36, 30],
-		[15, 9, 21, 14, 10],
-		[39, 9, 45, 14, 10],
-		[7, 23, 13, 28, 10],
-		[47, 23, 53, 28, 10],
-		[15, 45, 21, 50, 10],
-		[39, 45, 45, 50, 10],
+		[7, 9, 12, 14, 8],
+		[19, 9, 24, 14, 8],
+		[35, 9, 40, 14, 8],
+		[47, 9, 52, 14, 8],
+		[7, 23, 12, 28, 8],
+		[7, 35, 12, 40, 8],
+		[47, 23, 52, 28, 8],
+		[47, 35, 52, 40, 8],
+		[7, 45, 12, 50, 8],
+		[19, 45, 24, 50, 8],
+		[35, 45, 40, 50, 8],
+		[47, 45, 52, 50, 8],
 	];
 	let gerados = 0;
 	for (const r of regioes) {
@@ -295,13 +301,39 @@ export function atualizarInimigos(dt: number): void {
 				e.y = ey;
 			}
 		}
-		// Contato com qualquer jogador vivo
+		// Contato sólido com qualquer jogador vivo (mordida + empurrão físico)
 		for (const [, js] of mundo.jogadores) {
 			if (js.morto || js.pausado) {
 				continue;
 			}
-			if (dist2(e.x, e.y, js.x, js.y) < (e.info.tamanho / 2 + 10) * (e.info.tamanho / 2 + 10)) {
+			const rr = e.info.tamanho / 2 + 10;
+			const d2 = dist2(e.x, e.y, js.x, js.y);
+			if (d2 < rr * rr) {
 				ferirJogador(js, e.danoContato);
+				if (d2 > 1) {
+					// Corpos sólidos: ninguém fica dentro do mesmo pixel
+					const d = math.sqrt(d2);
+					const overlap = rr - d;
+					const nx = (js.x - e.x) / d;
+					const ny = (js.y - e.y) / d;
+					const er = e.info.tamanho / 2;
+					const ex = e.x - nx * overlap * 0.7;
+					if (!areaSolida(ex, e.y, er)) {
+						e.x = ex;
+					}
+					const ey = e.y - ny * overlap * 0.7;
+					if (!areaSolida(e.x, ey, er)) {
+						e.y = ey;
+					}
+					const jx = js.x + nx * overlap * 0.3;
+					if (!areaSolida(jx, js.y, 10)) {
+						js.x = jx;
+					}
+					const jy = js.y + ny * overlap * 0.3;
+					if (!areaSolida(js.x, jy, 10)) {
+						js.y = jy;
+					}
+				}
 			}
 		}
 		// Tiros SÓ com visão (nada de atirar através da parede)
@@ -350,8 +382,8 @@ export function atualizarInimigos(dt: number): void {
 	}
 
 	debug.profileend(); // PQ_Inimigos
-	// Separação leve anti-empilhamento (hordas WWZ se apertam, mas não fundem)
-	if (mundo.inimigos.size() <= 80) {
+	// Separação sólida anti-empilhamento (hordas WWZ se apertam, mas não fundem)
+	if (mundo.inimigos.size() <= 150) {
 		for (let i = 0; i < mundo.inimigos.size(); i++) {
 			for (let j = i + 1; j < mundo.inimigos.size(); j++) {
 				const a = mundo.inimigos[i];
@@ -360,7 +392,7 @@ export function atualizarInimigos(dt: number): void {
 				const d2 = dist2(a.x, a.y, b.x, b.y);
 				if (d2 > 1 && d2 < rr * rr) {
 					const d = math.sqrt(d2);
-					const emp = ((rr - d) / d) * 0.4;
+					const emp = ((rr - d) / d) * 0.55;
 					const sx = (b.x - a.x) * emp;
 					const sy = (b.y - a.y) * emp;
 					if (!areaSolida(a.x - sx, a.y - sy, a.info.tamanho / 2)) {

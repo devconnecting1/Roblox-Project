@@ -910,7 +910,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 				c.head.TextColor3 = COR_TEXTO;
 				c.mid.Text = m.nome;
 				c.mid.TextColor3 = COR_TEXTO;
-				c.foot.Text = "SALÃO + 6 SALAS • EXTERMÍNIO";
+				c.foot.Text = "SALÃO + 12 SALAS • EXTERMÍNIO";
 				c.btn.BackgroundColor3 = Color3.fromRGB(45, 52, 66);
 				c.lockCorpo.Visible = false;
 				c.lockArco.Visible = false;

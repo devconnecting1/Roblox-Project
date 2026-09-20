@@ -387,6 +387,43 @@ export function atualizarJogadores(dt: number): void {
 		}
 	}
 
+	// Colisão jogador↔jogador: corpos sólidos (sem stacking no spawn)
+	const vivos: JogadorS[] = [];
+	for (const [, js] of mundo.jogadores) {
+		if (!js.morto && !js.pausado) {
+			vivos.push(js);
+		}
+	}
+	for (let i = 0; i < vivos.size(); i++) {
+		for (let j = i + 1; j < vivos.size(); j++) {
+			const a = vivos[i];
+			const b = vivos[j];
+			const d2 = dist2(a.x, a.y, b.x, b.y);
+			if (d2 > 1 && d2 < 20 * 20) {
+				const d = math.sqrt(d2);
+				const overlap = (20 - d) / 2;
+				const nx = (b.x - a.x) / d;
+				const ny = (b.y - a.y) / d;
+				const ax2 = a.x - nx * overlap;
+				if (!areaSolida(ax2, a.y, 10)) {
+					a.x = ax2;
+				}
+				const ay2 = a.y - ny * overlap;
+				if (!areaSolida(a.x, ay2, 10)) {
+					a.y = ay2;
+				}
+				const bx2 = b.x + nx * overlap;
+				if (!areaSolida(bx2, b.y, 10)) {
+					b.x = bx2;
+				}
+				const by2 = b.y + ny * overlap;
+				if (!areaSolida(b.x, by2, 10)) {
+					b.y = by2;
+				}
+			}
+		}
+	}
+
 	debug.profileend(); // PQ_Jogadores
 }
 
