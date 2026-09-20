@@ -30,6 +30,8 @@ function enviarFoto(js: JogadorS): void {
 	const fins: Foto["inimigos"] = [];
 	const semFog = mundo.modo === "lobby"; // lobby: todos se veem
 	let bossFracao = -1;
+	let bossHp = 0;
+	let bossMax = 0;
 	for (const e of mundo.inimigos) {
 		if (!semFog && !visivelPara(js, e.x, e.y)) {
 			continue;
@@ -49,6 +51,8 @@ function enviarFoto(js: JogadorS): void {
 		});
 		if (e.boss) {
 			bossFracao = e.hp / e.hpMax;
+			bossHp = math.floor(e.hp);
+			bossMax = math.floor(e.hpMax);
 		}
 	}
 	const fbalas: Foto["balas"] = [];
@@ -107,6 +111,8 @@ function enviarFoto(js: JogadorS): void {
 		quests: fquests,
 		questsCompletas: js.questsCompletas,
 		bossFracao: bossFracao,
+		bossHp: bossHp,
+		bossMax: bossMax,
 		mochila: mochilaIds,
 		titulos: js.titulos,
 		tituloEq: js.tituloEq !== undefined ? js.tituloEq : "",

@@ -59,6 +59,23 @@ interface EntFrame {
 
 interface TilePool {
 	frame: Frame;
+	linhaH: Frame; // rejunte horizontal (ou highlight da parede)
+	linhaV: Frame; // rejunte vertical (só chão, alternado = tijolo)
+}
+
+// Cor da argamassa entre tijolos (constante: sem custo de update)
+const COR_ARGAMASSA = Color3.fromRGB(10, 12, 16);
+
+/** Variação determinística de tom por tile (estável ao rolar a câmera). */
+function tomComJitter(cor: Color3, tx: number, ty: number): Color3 {
+	const j = ((tx * 73 + ty * 149) % 5) - 2; // -2..2
+	const m = 1 + j * 0.035;
+	return new Color3(math.clamp(cor.R * m, 0, 1), math.clamp(cor.G * m, 0, 1), math.clamp(cor.B * m, 0, 1));
+}
+
+/** Clareia uma cor (relevo do topo da parede). */
+function clarear(cor: Color3, f: number): Color3 {
+	return new Color3(math.clamp(cor.R * f, 0, 1), math.clamp(cor.G * f, 0, 1), math.clamp(cor.B * f, 0, 1));
 }
 
 // ---------- Telas (construídas abaixo com ui.ts) ----------
@@ -258,6 +275,22 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	telaJogo.ClipsDescendants = true;
 	const arena = novoQuadro(telaJogo, "Arena", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_FUNDO, 0);
 	arena.ClipsDescendants = true;
+	// Vinheta escura nas bordas (clima da referência): 2 faixas estáticas, sem custo por frame
+	for (let v = 0; v < 2; v++) {
+		const larg = 26;
+		const transp = v === 0 ? 0.5 : 0.78;
+		const off = v * larg;
+		const faixas = [
+			[new UDim2(1, 0, 0, larg), new UDim2(0, 0, 0, off)],
+			[new UDim2(1, 0, 0, larg), new UDim2(0, 0, 1, -larg - off)],
+			[new UDim2(0, larg, 1, 0), new UDim2(0, off, 0, 0)],
+			[new UDim2(0, larg, 1, 0), new UDim2(1, -larg - off, 0, 0)],
+		];
+		for (let k = 0; k < 4; k++) {
+			const f = novoQuadro(telaJogo, `Vin${v}${k}`, faixas[k][0], faixas[k][1], Color3.fromRGB(0, 0, 0), transp);
+			f.ZIndex = 40;
+		}
+	}
 
 	const hud = novoQuadro(telaJogo, "HUD", new UDim2(1, 0, 0, 40), new UDim2(0, 0, 0, TOPO_Y), COR_PAINEL, 0.1);
 	hud.ZIndex = 50;
@@ -327,27 +360,32 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		fb.Visible = false;
 		fillBorda.push(fb);
 	}
+	const txtBossNome = novoTexto(
+		telaJogo,
+		"BossNome",
+		"Sereia da Praia",
+		13,
+		COR_TEXTO,
+		new UDim2(0, 300, 0, 18),
+		new UDim2(0, 12, 0, 80),
+	);
+	txtBossNome.ZIndex = 60;
+	txtBossNome.Visible = false;
+	txtBossNome.TextXAlignment = Enum.TextXAlignment.Left;
 	const barraBossFundo = novoQuadro(
 		telaJogo,
 		"BossFundo",
-		new UDim2(0, 400, 0, 14),
-		new UDim2(0.5, -200, 0, TOPO_Y + 78),
-		Color3.fromRGB(60, 10, 40),
+		new UDim2(0, 300, 0, 30),
+		new UDim2(0, 12, 0, 100),
+		Color3.fromRGB(20, 8, 18),
 		0,
 	);
 	barraBossFundo.ZIndex = 60;
 	barraBossFundo.Visible = false;
+	borda(barraBossFundo, Color3.fromRGB(255, 190, 30), 3);
 	const barraBoss = novoQuadro(barraBossFundo, "Boss", new UDim2(1, 0, 1, 0), new UDim2(0, 0, 0, 0), COR_PERIGO, 0);
-	const txtBoss = novoTexto(
-		telaJogo,
-		"BossNome",
-		"",
-		16,
-		COR_TEXTO,
-		new UDim2(0, 400, 0, 22),
-		new UDim2(0.5, -200, 0, TOPO_Y + 94),
-	);
-	txtBoss.ZIndex = 60;
+	const txtBoss = novoTexto(telaJogo, "BossHp", "", 20, COR_TEXTO, new UDim2(0, 300, 0, 30), new UDim2(0, 12, 0, 100));
+	txtBoss.ZIndex = 61;
 	txtBoss.Visible = false;
 
 	// ----- Painel de opções (tarefas, mochila, equipamentos) -----
@@ -499,6 +537,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	let hudOnda = "";
 	let hudPausa = false;
 	let hudBossV = false;
+	let hudBossTxt = "";
 	let plVida = -1;
 	let plXp = -1;
 	let plNv = -1;
@@ -696,7 +735,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			);
 			f.ZIndex = 1;
 			f.Visible = false;
-			tiles.push({ frame: f });
+			const lh = novoQuadro(camada, `TH${i}`, new UDim2(0, TILE, 0, 4), new UDim2(0, 0, 0, 22), COR_ARGAMASSA, 0.5);
+			lh.ZIndex = 1;
+			lh.Visible = false;
+			const lv = novoQuadro(camada, `TV${i}`, new UDim2(0, 4, 0, 22), new UDim2(0, 10, 0, 1), COR_ARGAMASSA, 0.5);
+			lv.ZIndex = 1;
+			lv.Visible = false;
+			tiles.push({ frame: f, linhaH: lh, linhaV: lv });
 		}
 		camTileX = -1;
 		camTileY = -1;
@@ -792,13 +837,33 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			const exp = dentro && explorado[ty * MUNDO_TX + tx];
 			if (!vis && !exp) {
 				t.frame.Visible = false; // inexplorado: some (fundo preto)
+				t.linhaH.Visible = false;
+				t.linhaV.Visible = false;
 				continue;
 			}
+			const parede = ch === "R" || ch === "W";
+			const base = vis ? (COR_TILE[ch] ?? COR_TILE["G"]) : (COR_ESCURA[ch] ?? COR_DESCONHECIDO);
 			t.frame.Visible = true;
-			if (vis) {
-				t.frame.BackgroundColor3 = COR_TILE[ch] ?? COR_TILE["G"];
+			t.frame.BackgroundColor3 = tomComJitter(base, tx, ty);
+			const slotX = (i % tilesCols) * TILE;
+			const slotY = math.floor(i / tilesCols) * TILE;
+			if (parede) {
+				// Relevo: faixa clara no topo da parede
+				t.linhaH.Visible = true;
+				t.linhaH.Size = new UDim2(0, TILE, 0, 6);
+				t.linhaH.Position = new UDim2(0, slotX, 0, slotY);
+				t.linhaH.BackgroundColor3 = clarear(base, 1.7);
+				t.linhaH.BackgroundTransparency = 0;
+				t.linhaV.Visible = false;
 			} else {
-				t.frame.BackgroundColor3 = COR_ESCURA[ch] ?? COR_DESCONHECIDO;
+				// Tijolo: rejunte escuro alternado por fileira
+				t.linhaH.Visible = true;
+				t.linhaH.Size = new UDim2(0, TILE, 0, 4);
+				t.linhaH.Position = new UDim2(0, slotX, 0, slotY + 22);
+				t.linhaH.BackgroundColor3 = COR_ARGAMASSA;
+				t.linhaH.BackgroundTransparency = 0.5;
+				t.linhaV.Visible = true;
+				t.linhaV.Position = new UDim2(0, slotX + ((tx + ty) % 2 === 0 ? 10 : 34), 0, slotY + 1);
 			}
 		}
 	}
@@ -1087,12 +1152,24 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 	});
 
 	// ===== Entidades (render a partir da foto, com suavização) =====
-	function obterInimigo(id: number, tam: number, cor: Color3, nv: number): EntFrame {
+	function obterInimigo(id: number, tam: number, cor: Color3, nv: number, brilho?: Color3): EntFrame {
 		let ent = entInimigos[id];
 		if (ent === undefined) {
 			const f = novoQuadro(arena, `E${id}`, new UDim2(0, tam, 0, tam), new UDim2(0, 0, 0, 0), cor, 0);
 			f.ZIndex = 8;
 			borda(f, Color3.fromRGB(10, 10, 10), 2);
+			if (brilho !== undefined) {
+				// Halo do boss (vermelho, como na referência)
+				const haloB = novoQuadro(
+					f,
+					"HaloB",
+					new UDim2(0, tam + 30, 0, tam + 30),
+					new UDim2(0, -15, 0, -15),
+					brilho,
+					0.82,
+				);
+				haloB.ZIndex = 7;
+			}
 			const barra = novoQuadro(f, "HP", new UDim2(1, 0, 0, 4), new UDim2(0, 0, 0, -6), COR_VIDA, 0);
 			barra.ZIndex = 9;
 			const rot = novoTexto(
@@ -1125,6 +1202,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			);
 			f.ZIndex = 10;
 			borda(f, COR_TEXTO, 2);
+			const haloO = novoQuadro(
+				f,
+				"Halo",
+				new UDim2(0, 40, 0, 40),
+				new UDim2(0, -11, 0, -11),
+				Color3.fromRGB(255, 150, 60),
+				0.82,
+			);
+			haloO.ZIndex = 8;
 			const rot = novoTexto(f, "Nome", nome, 10, COR_TEXTO, new UDim2(0, 60, 0, 12), new UDim2(0, -21, 0, -15));
 			rot.ZIndex = 11;
 			ent = { frame: f, barra: undefined, rx: 0, ry: 0 };
@@ -1142,6 +1228,25 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const p = novoQuadro(arena, "Player", new UDim2(0, 20, 0, 20), new UDim2(0, 0, 0, 0), c.cor, 0);
 		p.ZIndex = 10;
 		borda(p, COR_TEXTO, 2);
+		// Halo quente atrás do sprite (clima da referência)
+		const halo1 = novoQuadro(
+			p,
+			"Halo1",
+			new UDim2(0, 46, 0, 46),
+			new UDim2(0, -13, 0, -13),
+			Color3.fromRGB(255, 150, 60),
+			0.8,
+		);
+		halo1.ZIndex = 8;
+		const halo2 = novoQuadro(
+			p,
+			"Halo2",
+			new UDim2(0, 72, 0, 72),
+			new UDim2(0, -26, 0, -26),
+			Color3.fromRGB(255, 150, 60),
+			0.9,
+		);
+		halo2.ZIndex = 7;
 		const olho = novoQuadro(p, "Olho", new UDim2(0, 6, 0, 6), new UDim2(0, 11, 0, 7), COR_TEXTO, 0);
 		olho.ZIndex = 11;
 		const brilho = novoQuadro(
@@ -1238,6 +1343,8 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		inimigosVistos = {};
 		for (const t of tiles) {
 			t.frame.Visible = false; // sem frame velho: preto até a nova grade chegar
+			t.linhaH.Visible = false;
+			t.linhaV.Visible = false;
 		}
 		if (framePlayer !== undefined) {
 			framePlayer.Destroy();
@@ -1251,6 +1358,7 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		}
 		barraBossFundo.Visible = false;
 		txtBoss.Visible = false;
+		txtBossNome.Visible = false;
 		ultimaFoto = undefined;
 		primeiraFoto = false;
 		camPronta = false;
@@ -1869,7 +1977,13 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 		const vistos: { [id: number]: boolean } = {};
 		for (const e of foto.inimigos) {
 			vistos[e.id] = true;
-			const ent = obterInimigo(e.id, e.tam, new Color3(e.r / 255, e.g / 255, e.b / 255), e.nv);
+			const ent = obterInimigo(
+				e.id,
+				e.tam,
+				new Color3(e.r / 255, e.g / 255, e.b / 255),
+				e.nv,
+				e.boss ? Color3.fromRGB(255, 60, 60) : undefined,
+			);
 			ent.frame.BackgroundColor3 = new Color3(e.r / 255, e.g / 255, e.b / 255);
 			suavizar(ent, e.x, e.y, dt);
 			ent.frame.Position = new UDim2(0, tX(ent.rx) - e.tam / 2, 0, tY(ent.ry) - e.tam / 2);
@@ -1976,12 +2090,15 @@ export function iniciarJogo(playerGui: PlayerGui): void {
 			hudBossV = temBoss;
 			barraBossFundo.Visible = temBoss;
 			txtBoss.Visible = temBoss;
-			if (temBoss) {
-				txtBoss.Text = "Sereia da Praia";
-			}
+			txtBossNome.Visible = temBoss;
 		}
 		if (temBoss) {
 			barraBoss.Size = new UDim2(foto.bossFracao, 0, 1, 0);
+			const txtHp = `${foto.bossHp}/${foto.bossMax}`;
+			if (txtHp !== hudBossTxt) {
+				hudBossTxt = txtHp;
+				txtBoss.Text = txtHp;
+			}
 		}
 		dbgT += dt;
 		if (dbgT >= 0.1) {

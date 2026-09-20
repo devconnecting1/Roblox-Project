@@ -462,6 +462,8 @@ export interface Foto {
 	quests: FotoQuest[];
 	questsCompletas: number;
 	bossFracao: number; // -1 = sem boss à vista
+	bossHp: number; // hp atual do boss (0 = sem boss)
+	bossMax: number; // hp máximo do boss (0 = sem boss)
 	mochila: string[];
 	titulos: string[]; // títulos desbloqueados (ids)
 	tituloEq: string; // título equipado ("" = nenhum)
